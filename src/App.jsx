@@ -161,12 +161,123 @@ function StudentScheduleEditor({schedule, onChange, teachers, defaultTeacherId})
   );
 }
 
-/* ── 전체 시간표 ── */
+/* ── 모바일 감지 훅 ── */
+function useIsMobile(){
+  const [mob,setMob]=useState(()=>window.innerWidth<768);
+  useEffect(()=>{const h=()=>setMob(window.innerWidth<768);window.addEventListener("resize",h);return()=>window.removeEventListener("resize",h);},[]);
+  return mob;
+}
+
+/* ── 슬롯 카드 (공통) ── */
+function SlotCard({s,onStudentClick}){
+  return(
+    <div onClick={()=>onStudentClick(s)}
+      style={{background:s._teacher?s._teacher.color+"15":"#eff6ff",borderLeft:`3px solid ${s._teacher?.color||C.accent}`,borderRadius:"6px",padding:"4px 8px",marginBottom:"4px",fontSize:"0.78rem",color:C.text,fontFamily:C.font,lineHeight:1.5,cursor:"pointer",transition:"all .15s",boxShadow:"0 1px 3px rgba(0,0,0,.06)"}}
+      onMouseEnter={e=>e.currentTarget.style.opacity=".8"}
+      onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
+      <span style={{fontWeight:700,color:s._teacher?.color||C.accent}}>{s.name}</span>
+      <span style={{color:C.muted,marginLeft:"5px",fontSize:"0.7rem"}}>{s.grade}</span>
+      {s._teacher&&<div style={{color:s._teacher.color,fontSize:"0.68rem"}}>{s._teacher.name}</div>}
+    </div>
+  );
+}
+
+/* ── 모바일: 하루씩 보기 ── */
+function MobileDaySched({teachers,students,onStudentClick}){
+  const [selDay,setSelDay]=useState(DAYS[0]);
+  const getTeacher=(s,time)=>{const sc=s.schedule?.find(sc=>sc.day===selDay&&sc.time===time);return teachers.find(t=>t.id===(sc?.teacherId||s.teacherId));};
+
+  const slots=useMemo(()=>{
+    const result=[];
+    TIMES.forEach(time=>{
+      const isHour=time.endsWith(":00");
+      const here=students.filter(s=>s.schedule?.some(sc=>sc.day===selDay&&sc.time===time))
+        .map(s=>({...s,_teacher:getTeacher(s,time)}));
+      if(isHour&&here.length>0) result.push({time,isHour:true,students:here});
+      else if(!isHour&&here.length>0) result.push({time,isHour:false,students:here});
+      else if(isHour) result.push({time,isHour:true,students:[]});
+    });
+    return result;
+  },[selDay,students,teachers]);
+
+  // 수업 있는 시간만 추려서 보여줌
+  const activeTimes=useMemo(()=>{
+    const hours=new Set();
+    students.forEach(s=>s.schedule?.forEach(sc=>{if(sc.day===selDay)hours.add(sc.time.split(":")[0]);}) );
+    return TIMES.filter(t=>{
+      const h=t.split(":")[0];
+      return hours.has(h);
+    });
+  },[selDay,students]);
+
+  return(
+    <div>
+      {/* 요일 탭 */}
+      <div style={{display:"flex",gap:"4px",marginBottom:"1rem",overflowX:"auto",paddingBottom:"4px"}}>
+        {DAYS.map(d=>{
+          const hasSched=students.some(s=>s.schedule?.some(sc=>sc.day===d));
+          return(
+            <button key={d} onClick={()=>setSelDay(d)} style={{
+              flexShrink:0,border:`2px solid ${selDay===d?C.accent:C.border}`,borderRadius:"10px",
+              padding:"6px 14px",cursor:"pointer",fontFamily:C.font,fontWeight:700,fontSize:"0.82rem",
+              background:selDay===d?C.accent:"#fff",color:selDay===d?"#fff":hasSched?C.text2:C.muted,
+              transition:"all .15s",position:"relative"
+            }}>
+              {d}
+              {hasSched&&selDay!==d&&<span style={{position:"absolute",top:"3px",right:"3px",width:"6px",height:"6px",borderRadius:"50%",background:C.accent}}/>}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 선택한 요일의 시간표 */}
+      {activeTimes.length===0?(
+        <div style={{textAlign:"center",padding:"2.5rem",color:C.muted,fontFamily:C.font,background:C.card2,borderRadius:"12px",border:`1px solid ${C.border}`}}>
+          {selDay}요일 수업 없음
+        </div>
+      ):(
+        <div>
+          {TIMES.filter(t=>t.endsWith(":00")).map(hourTime=>{
+            const h=hourTime.split(":")[0];
+            const s00=students.filter(s=>s.schedule?.some(sc=>sc.day===selDay&&sc.time===hourTime)).map(s=>({...s,_teacher:getTeacher(s,hourTime)}));
+            const s30=students.filter(s=>s.schedule?.some(sc=>sc.day===selDay&&sc.time===`${h}:30`)).map(s=>({...s,_teacher:getTeacher(s,`${h}:30`)}));
+            if(s00.length===0&&s30.length===0) return null;
+            return(
+              <div key={hourTime} style={{marginBottom:"10px",background:C.card2,borderRadius:"12px",border:`1px solid ${C.border}`,overflow:"hidden"}}>
+                <div style={{background:C.accent+"12",padding:"6px 12px",borderBottom:`1px solid ${C.border}`,display:"flex",gap:"8px",alignItems:"center"}}>
+                  <span style={{fontWeight:700,fontSize:"0.85rem",color:C.accent,fontFamily:C.font,minWidth:"42px"}}>{hourTime}</span>
+                  {s00.length>0&&<span style={{fontSize:"0.72rem",color:C.muted,fontFamily:C.font}}>{s00.map(s=>s.name).join(", ")}</span>}
+                </div>
+                <div style={{padding:"8px 12px"}}>
+                  {s00.length>0&&s00.map(s=><SlotCard key={s.id} s={s} onStudentClick={onStudentClick}/>)}
+                  {s30.length>0&&(
+                    <div style={{marginTop:s00.length>0?"6px":0}}>
+                      <div style={{fontSize:"0.7rem",color:C.muted,fontFamily:C.font,marginBottom:"4px",fontWeight:600}}>{h}:30</div>
+                      {s30.map(s=><SlotCard key={s.id} s={s} onStudentClick={onStudentClick}/>)}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── 전체 시간표 (PC/모바일 자동 전환) ── */
 function FullSched({teachers, students, onStudentClick}) {
+  const isMobile=useIsMobile();
   const [filterDays,setFilterDays]=useState([...DAYS]);
   const showDays=DAYS.filter(d=>filterDays.includes(d));
   const toggleDay=d=>setFilterDays(p=>p.includes(d)?p.filter(x=>x!==d):[...p,d]);
   const getTeacher=(s,day,time)=>{const sc=s.schedule?.find(sc=>sc.day===day&&sc.time===time);return teachers.find(t=>t.id===(sc?.teacherId||s.teacherId));};
+
+  // 모바일은 요일탭 방식
+  if(isMobile) return <MobileDaySched teachers={teachers} students={students} onStudentClick={onStudentClick}/>;
+
+  // PC는 기존 전체 테이블
   return (
     <div>
       <div style={{display:"flex",gap:"5px",marginBottom:"1rem",flexWrap:"wrap"}}>
@@ -215,26 +326,90 @@ function FullSched({teachers, students, onStudentClick}) {
   );
 }
 
-/* ── 선생님별 시간표 ── */
+/* ── 선생님별 시간표 (PC/모바일 자동 전환) ── */
 function TeacherSched({teacher, students, onStudentClick}) {
+  const isMobile=useIsMobile();
+  const [selDay,setSelDay]=useState(DAYS[0]);
+
   const getStudentsForSlot=(day,time)=>students.filter(s=>{
     const sc=s.schedule?.find(sc=>sc.day===day&&sc.time===time);
     if(!sc) return false;
     return (sc.teacherId||s.teacherId)===teacher.id;
   });
   const myStudents=[...new Map(students.filter(s=>s.schedule?.some(sc=>(sc.teacherId||s.teacherId)===teacher.id)).map(s=>[s.id,s])).values()];
+
+  // 담당 학생 태그
+  const studentTags=(
+    <div style={{display:"flex",gap:"6px",flexWrap:"wrap",marginBottom:"1rem"}}>
+      {myStudents.map(s=>(
+        <div key={s.id} onClick={()=>onStudentClick(s)} style={{background:teacher.color+"15",borderRadius:"8px",padding:"5px 12px",cursor:"pointer",border:`1px solid ${teacher.color}30`,transition:"all .15s"}}
+          onMouseEnter={e=>e.currentTarget.style.background=teacher.color+"28"} onMouseLeave={e=>e.currentTarget.style.background=teacher.color+"15"}>
+          <span style={{color:teacher.color,fontWeight:700,fontSize:"0.8rem",fontFamily:C.font}}>{s.name}</span>
+          <span style={{color:C.muted,fontSize:"0.7rem",marginLeft:"5px",fontFamily:C.font}}>{s.grade}</span>
+        </div>
+      ))}
+      {myStudents.length===0&&<span style={{color:C.muted,fontSize:"0.8rem",fontFamily:C.font}}>담당 원생 없음</span>}
+    </div>
+  );
+
+  // 모바일: 요일탭
+  if(isMobile) return(
+    <div>
+      {studentTags}
+      <div style={{display:"flex",gap:"4px",marginBottom:"1rem",overflowX:"auto",paddingBottom:"4px"}}>
+        {DAYS.map(d=>{
+          const hasSched=myStudents.some(s=>s.schedule?.some(sc=>sc.day===d));
+          return(
+            <button key={d} onClick={()=>setSelDay(d)} style={{
+              flexShrink:0,border:`2px solid ${selDay===d?teacher.color:C.border}`,borderRadius:"10px",
+              padding:"6px 14px",cursor:"pointer",fontFamily:C.font,fontWeight:700,fontSize:"0.82rem",
+              background:selDay===d?teacher.color+"22":"#fff",color:selDay===d?teacher.color:hasSched?C.text2:C.muted,
+              transition:"all .15s"
+            }}>{d}</button>
+          );
+        })}
+      </div>
+      {TIMES.filter(t=>t.endsWith(":00")).map(hourTime=>{
+        const h=hourTime.split(":")[0];
+        const s00=getStudentsForSlot(selDay,hourTime);
+        const s30=getStudentsForSlot(selDay,`${h}:30`);
+        if(s00.length===0&&s30.length===0) return null;
+        return(
+          <div key={hourTime} style={{marginBottom:"10px",background:C.card2,borderRadius:"12px",border:`1px solid ${C.border}`,overflow:"hidden"}}>
+            <div style={{background:teacher.color+"12",padding:"6px 12px",borderBottom:`1px solid ${C.border}`}}>
+              <span style={{fontWeight:700,fontSize:"0.85rem",color:teacher.color,fontFamily:C.font}}>{hourTime}</span>
+            </div>
+            <div style={{padding:"8px 12px"}}>
+              {s00.map(s=>(
+                <div key={s.id} onClick={()=>onStudentClick(s)} style={{background:teacher.color+"15",borderLeft:`3px solid ${teacher.color}`,borderRadius:"6px",padding:"6px 10px",marginBottom:"4px",cursor:"pointer",transition:"all .15s"}}
+                  onMouseEnter={e=>e.currentTarget.style.opacity=".8"} onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
+                  <span style={{fontWeight:700,color:teacher.color,fontFamily:C.font}}>{s.name}</span>
+                  <span style={{color:C.muted,fontSize:"0.75rem",marginLeft:"6px",fontFamily:C.font}}>{s.grade}</span>
+                </div>
+              ))}
+              {s30.length>0&&(
+                <div style={{marginTop:s00.length>0?"6px":0}}>
+                  <div style={{fontSize:"0.72rem",color:C.muted,fontFamily:C.font,marginBottom:"4px",fontWeight:600}}>{h}:30</div>
+                  {s30.map(s=>(
+                    <div key={s.id} onClick={()=>onStudentClick(s)} style={{background:teacher.color+"15",borderLeft:`3px solid ${teacher.color}`,borderRadius:"6px",padding:"6px 10px",marginBottom:"4px",cursor:"pointer",transition:"all .15s"}}
+                      onMouseEnter={e=>e.currentTarget.style.opacity=".8"} onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
+                      <span style={{fontWeight:700,color:teacher.color,fontFamily:C.font}}>{s.name}</span>
+                      <span style={{color:C.muted,fontSize:"0.75rem",marginLeft:"6px",fontFamily:C.font}}>{s.grade}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  // PC: 기존 테이블
   return (
     <div>
-      <div style={{display:"flex",gap:"6px",flexWrap:"wrap",marginBottom:"1rem"}}>
-        {myStudents.map(s=>(
-          <div key={s.id} onClick={()=>onStudentClick(s)} style={{background:teacher.color+"15",borderRadius:"8px",padding:"5px 12px",cursor:"pointer",border:`1px solid ${teacher.color}30`,transition:"all .15s"}}
-            onMouseEnter={e=>e.currentTarget.style.background=teacher.color+"28"} onMouseLeave={e=>e.currentTarget.style.background=teacher.color+"15"}>
-            <span style={{color:teacher.color,fontWeight:700,fontSize:"0.8rem",fontFamily:C.font}}>{s.name}</span>
-            <span style={{color:C.muted,fontSize:"0.7rem",marginLeft:"5px",fontFamily:C.font}}>{s.grade}</span>
-          </div>
-        ))}
-        {myStudents.length===0&&<span style={{color:C.muted,fontSize:"0.8rem",fontFamily:C.font}}>담당 원생 없음</span>}
-      </div>
+      {studentTags}
       <div style={{overflowX:"auto"}}>
         <table style={{borderCollapse:"collapse",width:"100%",minWidth:"420px"}}>
           <thead>
@@ -720,37 +895,64 @@ export default function App() {
   // 시간표 선생님 모달 안에서 쓰는 현재 학생 데이터
   const schedStudentData = scheduleStudentModal ? students.find(s=>s.id===scheduleStudentModal.id)||scheduleStudentModal : null;
 
+  const isMobile=useIsMobile();
+
   return (
     <div style={{minHeight:"100vh",background:C.bg,color:C.text,fontFamily:C.font}}>
+      {/* ── 헤더 (모바일: 2줄) ── */}
       <header style={{background:C.card,borderBottom:`1px solid ${C.border}`,position:"sticky",top:0,zIndex:100,boxShadow:"0 1px 4px rgba(0,0,0,.06)"}}>
-        <div style={{maxWidth:"1300px",margin:"0 auto",padding:"0 1.25rem",display:"flex",alignItems:"center",height:"56px",gap:"1.25rem"}}>
-          <div style={{display:"flex",alignItems:"center",gap:"8px",flexShrink:0}}>
-            <div style={{width:"32px",height:"32px",borderRadius:"9px",background:"linear-gradient(135deg,#3b82f6,#06b6d4)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1rem",boxShadow:"0 2px 8px rgba(59,130,246,.3)"}}>📐</div>
-            <span style={{fontWeight:800,fontSize:"1rem",letterSpacing:"-0.02em",color:C.text}}>봄 학원 관리</span>
+        {isMobile?(
+          /* 모바일 헤더 */
+          <div>
+            <div style={{padding:"0 1rem",display:"flex",alignItems:"center",justifyContent:"space-between",height:"48px"}}>
+              <div style={{display:"flex",alignItems:"center",gap:"7px"}}>
+                <div style={{width:"28px",height:"28px",borderRadius:"8px",background:"linear-gradient(135deg,#3b82f6,#06b6d4)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"0.85rem"}}>📐</div>
+                <span style={{fontWeight:800,fontSize:"0.9rem",color:C.text}}>봄 학원 관리</span>
+              </div>
+              <div style={{display:"flex",gap:"6px",alignItems:"center"}}>
+                <Btn sm v="ghost" onClick={()=>setShowPdf(true)}>🖨️ PDF</Btn>
+                <Btn sm v="purple" onClick={()=>setShowReport(true)}>📊</Btn>
+                <button onClick={()=>signOut(auth)} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:"0.75rem",fontFamily:C.font}}>로그아웃</button>
+              </div>
+            </div>
+            {/* 하단 탭바 */}
+            <div style={{display:"flex",borderTop:`1px solid ${C.border}`}}>
+              {TABS.map(t=>(
+                <button key={t.id} onClick={()=>setTab(t.id)} style={{flex:1,border:"none",padding:"8px 4px",cursor:"pointer",fontFamily:C.font,fontWeight:600,fontSize:"0.75rem",background:tab===t.id?"#eff6ff":C.card,color:tab===t.id?C.accent:C.text2,borderBottom:tab===t.id?`2px solid ${C.accent}`:"2px solid transparent",transition:"all .15s"}}>{t.l}</button>
+              ))}
+            </div>
           </div>
-          <nav style={{display:"flex",gap:"4px"}}>
-            {TABS.map(t=>(
-              <button key={t.id} onClick={()=>setTab(t.id)} style={{border:"none",borderRadius:"8px",padding:"6px 16px",cursor:"pointer",fontFamily:C.font,fontWeight:600,fontSize:"0.83rem",background:tab===t.id?"#eff6ff":C.bg,color:tab===t.id?C.accent:C.text2,transition:"all .15s",boxShadow:tab===t.id?"inset 0 0 0 1.5px #bfdbfe":"none"}}>{t.l}</button>
-            ))}
-          </nav>
-          <div style={{marginLeft:"auto",display:"flex",gap:"8px",alignItems:"center"}}>
-            <Btn sm v="ghost" onClick={()=>setShowPdf(true)}>🖨️ 시간표 PDF</Btn>
-            <Btn sm v="purple" onClick={()=>setShowReport(true)}>📊 레포트</Btn>
-            <span style={{fontSize:"0.72rem",color:C.muted}}>{user.email}</span>
-            <button onClick={()=>signOut(auth)} style={{background:"#fff",border:`1px solid ${C.border}`,borderRadius:"7px",padding:"4px 12px",color:C.text2,cursor:"pointer",fontSize:"0.72rem",fontFamily:C.font}}
-              onMouseEnter={e=>e.currentTarget.style.background=C.bg} onMouseLeave={e=>e.currentTarget.style.background="#fff"}>로그아웃</button>
+        ):(
+          /* PC 헤더 */
+          <div style={{maxWidth:"1300px",margin:"0 auto",padding:"0 1.25rem",display:"flex",alignItems:"center",height:"56px",gap:"1.25rem"}}>
+            <div style={{display:"flex",alignItems:"center",gap:"8px",flexShrink:0}}>
+              <div style={{width:"32px",height:"32px",borderRadius:"9px",background:"linear-gradient(135deg,#3b82f6,#06b6d4)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1rem",boxShadow:"0 2px 8px rgba(59,130,246,.3)"}}>📐</div>
+              <span style={{fontWeight:800,fontSize:"1rem",letterSpacing:"-0.02em",color:C.text}}>봄 학원 관리</span>
+            </div>
+            <nav style={{display:"flex",gap:"4px"}}>
+              {TABS.map(t=>(
+                <button key={t.id} onClick={()=>setTab(t.id)} style={{border:"none",borderRadius:"8px",padding:"6px 16px",cursor:"pointer",fontFamily:C.font,fontWeight:600,fontSize:"0.83rem",background:tab===t.id?"#eff6ff":C.bg,color:tab===t.id?C.accent:C.text2,transition:"all .15s",boxShadow:tab===t.id?"inset 0 0 0 1.5px #bfdbfe":"none"}}>{t.l}</button>
+              ))}
+            </nav>
+            <div style={{marginLeft:"auto",display:"flex",gap:"8px",alignItems:"center"}}>
+              <Btn sm v="ghost" onClick={()=>setShowPdf(true)}>🖨️ 시간표 PDF</Btn>
+              <Btn sm v="purple" onClick={()=>setShowReport(true)}>📊 레포트</Btn>
+              <span style={{fontSize:"0.72rem",color:C.muted}}>{user.email}</span>
+              <button onClick={()=>signOut(auth)} style={{background:"#fff",border:`1px solid ${C.border}`,borderRadius:"7px",padding:"4px 12px",color:C.text2,cursor:"pointer",fontSize:"0.72rem",fontFamily:C.font}}
+                onMouseEnter={e=>e.currentTarget.style.background=C.bg} onMouseLeave={e=>e.currentTarget.style.background="#fff"}>로그아웃</button>
+            </div>
           </div>
-        </div>
+        )}
       </header>
 
-      <main style={{maxWidth:"1300px",margin:"0 auto",padding:"1.25rem"}}>
-        {/* 통계 */}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:"12px",marginBottom:"1.25rem"}}>
+      <main style={{maxWidth:"1300px",margin:"0 auto",padding:isMobile?"0.75rem":"1.25rem"}}>
+        {/* 통계 (모바일: 2x2, PC: 4열) */}
+        <div style={{display:"grid",gridTemplateColumns:isMobile?"repeat(2,1fr)":"repeat(4,1fr)",gap:isMobile?"8px":"12px",marginBottom:isMobile?"0.75rem":"1.25rem"}}>
           {[{l:"전체 원생",v:`${students.length}명`,icon:"👨‍🎓",c:"#3b82f6",bg:"#eff6ff"},{l:"선생님",v:`${teachers.length}명`,icon:"👩‍🏫",c:"#8b5cf6",bg:"#f5f3ff"},{l:"오늘 출석",v:`${todayAtts.filter(a=>a==="present").length}명`,icon:"✅",c:"#10b981",bg:"#f0fdf4"},{l:"오늘 결석",v:`${todayAtts.filter(a=>a==="absent").length}명`,icon:"❌",c:"#ef4444",bg:"#fef2f2"}].map(({l,v,icon,c,bg})=>(
-            <div key={l} style={{background:C.card,borderRadius:"12px",padding:"1rem 1.1rem",border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(0,0,0,.05)"}}>
+            <div key={l} style={{background:C.card,borderRadius:"12px",padding:isMobile?"0.7rem":"1rem 1.1rem",border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(0,0,0,.05)"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-                <div><div style={{color:C.muted,fontSize:"0.72rem",marginBottom:"5px",fontWeight:600}}>{l}</div><div style={{fontWeight:800,fontSize:"1.1rem",color:c}}>{v}</div></div>
-                <div style={{width:"36px",height:"36px",borderRadius:"10px",background:bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.1rem"}}>{icon}</div>
+                <div><div style={{color:C.muted,fontSize:"0.68rem",marginBottom:"4px",fontWeight:600}}>{l}</div><div style={{fontWeight:800,fontSize:isMobile?"0.95rem":"1.1rem",color:c}}>{v}</div></div>
+                <div style={{width:isMobile?"28px":"36px",height:isMobile?"28px":"36px",borderRadius:"10px",background:bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:isMobile?"0.85rem":"1.1rem"}}>{icon}</div>
               </div>
             </div>
           ))}
@@ -787,43 +989,87 @@ export default function App() {
         {/* 원생 탭 */}
         {tab==="students"&&(
           <div>
+            {/* 검색/필터 (모바일: 세로 배치) */}
             <div style={{display:"flex",gap:"8px",marginBottom:"1rem",flexWrap:"wrap"}}>
-              <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 이름·학교·학년 검색" style={{flex:1,minWidth:"150px",background:C.card,border:`1.5px solid ${C.border}`,borderRadius:"10px",padding:"8px 14px",color:C.text,fontSize:"0.875rem",outline:"none",fontFamily:C.font}}
+              <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 이름·학교·학년 검색"
+                style={{flex:1,minWidth:"0",background:C.card,border:`1.5px solid ${C.border}`,borderRadius:"10px",padding:"8px 14px",color:C.text,fontSize:"0.875rem",outline:"none",fontFamily:C.font,width:isMobile?"100%":"auto",boxSizing:"border-box"}}
                 onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}/>
-              <select value={fT} onChange={e=>setFT(e.target.value)} style={{background:C.card,border:`1.5px solid ${C.border}`,borderRadius:"10px",padding:"8px 12px",color:C.text,fontSize:"0.875rem",outline:"none",fontFamily:C.font}}>
-                <option value="all">전체 선생님</option>{teachers.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
-              </select>
-              <select value={fSub} onChange={e=>setFSub(e.target.value)} style={{background:C.card,border:`1.5px solid ${C.border}`,borderRadius:"10px",padding:"8px 12px",color:C.text,fontSize:"0.875rem",outline:"none",fontFamily:C.font}}>
-                <option value="all">전체 과목</option>{SUBJECTS.map(s=><option key={s} value={s}>{s}</option>)}
-              </select>
-              <Btn onClick={()=>setAddS(true)}>+ 원생 추가</Btn>
+              {!isMobile&&<>
+                <select value={fT} onChange={e=>setFT(e.target.value)} style={{background:C.card,border:`1.5px solid ${C.border}`,borderRadius:"10px",padding:"8px 12px",color:C.text,fontSize:"0.875rem",outline:"none",fontFamily:C.font}}>
+                  <option value="all">전체 선생님</option>{teachers.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+                <select value={fSub} onChange={e=>setFSub(e.target.value)} style={{background:C.card,border:`1.5px solid ${C.border}`,borderRadius:"10px",padding:"8px 12px",color:C.text,fontSize:"0.875rem",outline:"none",fontFamily:C.font}}>
+                  <option value="all">전체 과목</option>{SUBJECTS.map(s=><option key={s} value={s}>{s}</option>)}
+                </select>
+              </>}
+              <Btn onClick={()=>setAddS(true)} style={isMobile?{width:"100%"}:{}}>+ 원생 추가</Btn>
             </div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:"12px"}}>
-              {filtered.map(st=>{
-                const teacher=teachers.find(t=>t.id===st.teacherId);const tr=st.records?.[td]||{};
-                return (
-                  <div key={st.id} onClick={()=>handleStudentTabClick(st)} style={{background:C.card,borderRadius:"13px",padding:"1.1rem",border:`1px solid ${C.border}`,cursor:"pointer",position:"relative",overflow:"hidden",transition:"all .2s",boxShadow:"0 1px 4px rgba(0,0,0,.06)"}}
-                    onMouseEnter={e=>{e.currentTarget.style.borderColor=teacher?.color||C.accent;e.currentTarget.style.transform="translateY(-3px)";e.currentTarget.style.boxShadow="0 8px 20px rgba(0,0,0,.1)";}}
-                    onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.transform="none";e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,.06)";}}>
-                    <div style={{position:"absolute",top:0,left:0,right:0,height:"4px",background:teacher?.color||C.accent,borderRadius:"13px 13px 0 0"}}/>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"6px"}}>
-                      <div><div style={{fontWeight:700,fontSize:"0.95rem",color:C.text}}>{st.name}</div><div style={{color:C.muted,fontSize:"0.72rem"}}>{st.grade} · {st.school}</div></div>
-                      {tr.att&&<Tag c={ATT_COLOR[tr.att]}>{ATT_LABEL[tr.att]}</Tag>}
+            {/* 모바일 필터 (선생님/과목) */}
+            {isMobile&&(
+              <div style={{display:"flex",gap:"6px",marginBottom:"0.75rem"}}>
+                <select value={fT} onChange={e=>setFT(e.target.value)} style={{flex:1,background:C.card,border:`1.5px solid ${C.border}`,borderRadius:"8px",padding:"7px 10px",color:C.text,fontSize:"0.82rem",outline:"none",fontFamily:C.font}}>
+                  <option value="all">전체 선생님</option>{teachers.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+                <select value={fSub} onChange={e=>setFSub(e.target.value)} style={{flex:1,background:C.card,border:`1.5px solid ${C.border}`,borderRadius:"8px",padding:"7px 10px",color:C.text,fontSize:"0.82rem",outline:"none",fontFamily:C.font}}>
+                  <option value="all">전체 과목</option>{SUBJECTS.map(s=><option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            )}
+            {/* 원생 목록: 모바일=리스트, PC=카드 */}
+            {isMobile?(
+              <div style={{display:"flex",flexDirection:"column",gap:"8px"}}>
+                {filtered.map(st=>{
+                  const teacher=teachers.find(t=>t.id===st.teacherId);const tr=st.records?.[td]||{};
+                  return(
+                    <div key={st.id} onClick={()=>handleStudentTabClick(st)}
+                      style={{background:C.card,borderRadius:"12px",padding:"0.85rem 1rem",border:`1px solid ${C.border}`,cursor:"pointer",display:"flex",alignItems:"center",gap:"12px",boxShadow:"0 1px 3px rgba(0,0,0,.06)",position:"relative",overflow:"hidden"}}>
+                      <div style={{position:"absolute",left:0,top:0,bottom:0,width:"4px",background:teacher?.color||C.accent,borderRadius:"12px 0 0 12px"}}/>
+                      <div style={{width:"40px",height:"40px",borderRadius:"50%",background:(teacher?.color||C.accent)+"18",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,color:teacher?.color||C.accent,fontSize:"1rem",flexShrink:0}}>{st.name[0]}</div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                          <span style={{fontWeight:700,fontSize:"0.95rem",color:C.text}}>{st.name}</span>
+                          {tr.att&&<Tag c={ATT_COLOR[tr.att]}>{ATT_LABEL[tr.att]}</Tag>}
+                        </div>
+                        <div style={{color:C.muted,fontSize:"0.74rem",marginTop:"2px"}}>{st.grade} · {st.school}</div>
+                        <div style={{display:"flex",gap:"4px",marginTop:"4px",flexWrap:"wrap"}}>
+                          <Tag c={teacher?.color||C.accent}>{st.subject}</Tag>
+                          {tr.hw&&<Tag c={HW_COLOR[tr.hw]}>숙제 {tr.hw.toUpperCase()}</Tag>}
+                        </div>
+                      </div>
+                      <span style={{color:C.muted,fontSize:"1.2rem"}}>›</span>
                     </div>
-                    <div style={{marginBottom:"6px",display:"flex",gap:"4px",flexWrap:"wrap"}}>
-                      <Tag c={teacher?.color||C.accent}>{st.subject}</Tag>
-                      {tr.hw&&<Tag c={HW_COLOR[tr.hw]}>숙제 {tr.hw.toUpperCase()}</Tag>}
+                  );
+                })}
+                {filtered.length===0&&<div style={{textAlign:"center",color:C.muted,padding:"3rem"}}>원생이 없습니다</div>}
+              </div>
+            ):(
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:"12px"}}>
+                {filtered.map(st=>{
+                  const teacher=teachers.find(t=>t.id===st.teacherId);const tr=st.records?.[td]||{};
+                  return (
+                    <div key={st.id} onClick={()=>handleStudentTabClick(st)} style={{background:C.card,borderRadius:"13px",padding:"1.1rem",border:`1px solid ${C.border}`,cursor:"pointer",position:"relative",overflow:"hidden",transition:"all .2s",boxShadow:"0 1px 4px rgba(0,0,0,.06)"}}
+                      onMouseEnter={e=>{e.currentTarget.style.borderColor=teacher?.color||C.accent;e.currentTarget.style.transform="translateY(-3px)";e.currentTarget.style.boxShadow="0 8px 20px rgba(0,0,0,.1)";}}
+                      onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.transform="none";e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,.06)";}}>
+                      <div style={{position:"absolute",top:0,left:0,right:0,height:"4px",background:teacher?.color||C.accent,borderRadius:"13px 13px 0 0"}}/>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"6px"}}>
+                        <div><div style={{fontWeight:700,fontSize:"0.95rem",color:C.text}}>{st.name}</div><div style={{color:C.muted,fontSize:"0.72rem"}}>{st.grade} · {st.school}</div></div>
+                        {tr.att&&<Tag c={ATT_COLOR[tr.att]}>{ATT_LABEL[tr.att]}</Tag>}
+                      </div>
+                      <div style={{marginBottom:"6px",display:"flex",gap:"4px",flexWrap:"wrap"}}>
+                        <Tag c={teacher?.color||C.accent}>{st.subject}</Tag>
+                        {tr.hw&&<Tag c={HW_COLOR[tr.hw]}>숙제 {tr.hw.toUpperCase()}</Tag>}
+                      </div>
+                      <div style={{display:"flex",gap:"3px",flexWrap:"wrap"}}>
+                        {(st.schedule||[]).slice(0,4).map((sc,i)=><span key={i} style={{fontSize:"0.64rem",padding:"2px 6px",borderRadius:"5px",background:C.bg,color:C.text2,fontFamily:C.font,border:`1px solid ${C.border}`}}>{sc.day} {sc.time}</span>)}
+                        {(st.schedule||[]).length>4&&<span style={{fontSize:"0.64rem",color:C.muted}}>+{st.schedule.length-4}</span>}
+                      </div>
+                      {teacher&&<div style={{marginTop:"6px",fontSize:"0.68rem",color:teacher.color,fontWeight:600}}>👩‍🏫 {teacher.name}</div>}
                     </div>
-                    <div style={{display:"flex",gap:"3px",flexWrap:"wrap"}}>
-                      {(st.schedule||[]).slice(0,4).map((sc,i)=><span key={i} style={{fontSize:"0.64rem",padding:"2px 6px",borderRadius:"5px",background:C.bg,color:C.text2,fontFamily:C.font,border:`1px solid ${C.border}`}}>{sc.day} {sc.time}</span>)}
-                      {(st.schedule||[]).length>4&&<span style={{fontSize:"0.64rem",color:C.muted}}>+{st.schedule.length-4}</span>}
-                    </div>
-                    {teacher&&<div style={{marginTop:"6px",fontSize:"0.68rem",color:teacher.color,fontWeight:600}}>👩‍🏫 {teacher.name}</div>}
-                  </div>
-                );
-              })}
-              {filtered.length===0&&<div style={{gridColumn:"1/-1",textAlign:"center",color:C.muted,padding:"3rem"}}>원생이 없습니다</div>}
-            </div>
+                  );
+                })}
+                {filtered.length===0&&<div style={{gridColumn:"1/-1",textAlign:"center",color:C.muted,padding:"3rem"}}>원생이 없습니다</div>}
+              </div>
+            )}
           </div>
         )}
 
