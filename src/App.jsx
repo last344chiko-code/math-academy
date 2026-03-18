@@ -22,6 +22,7 @@ for(let h=9;h<=21;h++){TIMES.push(`${String(h).padStart(2,'0')}:00`);TIMES.push(
 TIMES.push("22:00");
 
 const GRADES   = ["초1","초2","초3","초4","초5","초6","중1","중2","중3","고1","고2","고3"];
+const GRADE_ORDER = Object.fromEntries(GRADES.map((g,i)=>[g,i]));
 const SUBJECTS = ["수학","과학","수학+과학"];
 const TCOLORS  = ["#3b82f6","#f59e0b","#10b981","#ef4444","#8b5cf6","#ec4899","#06b6d4","#84cc16","#f97316","#6366f1"];
 const HW_OPTS  = ["a","b","c","d","n"];
@@ -36,18 +37,19 @@ const monthDates = ym => {
   return Array.from({length:new Date(y,m,0).getDate()},(_,i)=>`${ym}-${String(i+1).padStart(2,'0')}`);
 };
 
+/* ── 학년+이름 정렬 함수 ── */
+const sortStudents = (arr) => [...arr].sort((a,b) => {
+  const gd = (GRADE_ORDER[a.grade]??99) - (GRADE_ORDER[b.grade]??99);
+  if(gd!==0) return gd;
+  return (a.name||"").localeCompare(b.name||"","ko");
+});
+
 /* ── 라이트 테마 ── */
 const C = {
-  bg:"#f1f5f9",
-  card:"#ffffff",
-  card2:"#f8fafc",
-  border:"#e2e8f0",
-  border2:"#cbd5e1",
-  text:"#1e293b",
-  text2:"#475569",
-  muted:"#94a3b8",
-  accent:"#3b82f6",
-  font:"'Noto Sans KR','Apple SD Gothic Neo',sans-serif"
+  bg:"#f1f5f9", card:"#ffffff", card2:"#f8fafc",
+  border:"#e2e8f0", border2:"#cbd5e1",
+  text:"#1e293b", text2:"#475569", muted:"#94a3b8",
+  accent:"#3b82f6", font:"'Noto Sans KR','Apple SD Gothic Neo',sans-serif"
 };
 
 /* ── 공통 컴포넌트 ── */
@@ -56,16 +58,10 @@ const Tag = ({c="#3b82f6",children}) => (
 );
 
 const Btn = ({children,v="primary",sm,style:xs,...p}) => {
-  const m={
-    primary:{bg:"#3b82f6",fg:"#fff",hover:"#2563eb"},
-    ghost:{bg:"#f1f5f9",fg:C.text2,hover:"#e2e8f0"},
-    danger:{bg:"#ef4444",fg:"#fff",hover:"#dc2626"},
-    success:{bg:"#10b981",fg:"#fff",hover:"#059669"},
-    purple:{bg:"#8b5cf6",fg:"#fff",hover:"#7c3aed"}
-  };
+  const m={primary:{bg:"#3b82f6",fg:"#fff",hv:"#2563eb"},ghost:{bg:"#f1f5f9",fg:C.text2,hv:"#e2e8f0"},danger:{bg:"#ef4444",fg:"#fff",hv:"#dc2626"},success:{bg:"#10b981",fg:"#fff",hv:"#059669"},purple:{bg:"#8b5cf6",fg:"#fff",hv:"#7c3aed"}};
   const st=m[v]||m.primary;
-  return <button {...p} style={{border:"none",borderRadius:"8px",cursor:"pointer",fontFamily:C.font,fontWeight:600,padding:sm?"4px 12px":"8px 18px",fontSize:sm?"0.74rem":"0.85rem",background:st.bg,color:st.fg,transition:"all .15s",boxShadow:v==="primary"?"0 1px 3px rgba(59,130,246,.3)":v==="ghost"?"0 1px 2px rgba(0,0,0,.06)":"none",...xs}}
-    onMouseEnter={e=>e.currentTarget.style.background=st.hover}
+  return <button {...p} style={{border:"none",borderRadius:"8px",cursor:"pointer",fontFamily:C.font,fontWeight:600,padding:sm?"4px 12px":"8px 18px",fontSize:sm?"0.74rem":"0.85rem",background:st.bg,color:st.fg,transition:"all .15s",...xs}}
+    onMouseEnter={e=>e.currentTarget.style.background=st.hv}
     onMouseLeave={e=>e.currentTarget.style.background=st.bg}
   >{children}</button>;
 };
@@ -74,9 +70,7 @@ const Inp = ({label,...p}) => (
   <div style={{marginBottom:"0.9rem"}}>
     {label&&<div style={{fontSize:"0.75rem",color:C.text2,marginBottom:"4px",fontFamily:C.font,fontWeight:600}}>{label}</div>}
     <input {...p} style={{width:"100%",background:C.card2,border:`1.5px solid ${C.border}`,borderRadius:"8px",padding:"8px 12px",color:C.text,fontSize:"0.875rem",outline:"none",boxSizing:"border-box",fontFamily:C.font,transition:"border-color .15s",...p.style}}
-      onFocus={e=>e.target.style.borderColor=C.accent}
-      onBlur={e=>e.target.style.borderColor=C.border}
-    />
+      onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}/>
   </div>
 );
 
@@ -89,8 +83,9 @@ const Sel = ({label,opts,...p}) => (
   </div>
 );
 
-const Modal = ({title,onClose,wide,children}) => (
-  <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,.45)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem",backdropFilter:"blur(2px)"}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+/* ── Modal: zIndex prop 지원 ── */
+const Modal = ({title,onClose,wide,zIndex=200,children}) => (
+  <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,.45)",zIndex,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem",backdropFilter:"blur(2px)"}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
     <div style={{background:C.card,borderRadius:"16px",padding:"1.75rem",width:"100%",maxWidth:wide?"960px":"500px",maxHeight:"93vh",overflowY:"auto",border:`1px solid ${C.border}`,boxShadow:"0 20px 60px rgba(0,0,0,.15)"}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1.5rem"}}>
         <h3 style={{margin:0,color:C.text,fontSize:"1.05rem",fontFamily:C.font,fontWeight:700}}>{title}</h3>
@@ -128,44 +123,31 @@ function LoginScreen() {
 
 /* ── 학생 시간표 편집 ── */
 function StudentScheduleEditor({schedule, onChange, teachers, defaultTeacherId}) {
-  const getSlot = (d,t) => schedule.find(s=>s.day===d&&s.time===t);
-  const on = (d,t) => !!getSlot(d,t);
-  const tgl = (d,t) => {
-    if(on(d,t)) onChange(schedule.filter(s=>!(s.day===d&&s.time===t)));
-    else onChange([...schedule,{day:d,time:t,teacherId:defaultTeacherId||null}]);
-  };
-  const changeTeacher = (d,t,tid) => onChange(schedule.map(s=>(s.day===d&&s.time===t)?{...s,teacherId:tid||null}:s));
-
+  const getSlot=(d,t)=>schedule.find(s=>s.day===d&&s.time===t);
+  const on=(d,t)=>!!getSlot(d,t);
+  const tgl=(d,t)=>{if(on(d,t))onChange(schedule.filter(s=>!(s.day===d&&s.time===t)));else onChange([...schedule,{day:d,time:t,teacherId:defaultTeacherId||null}]);};
+  const chT=(d,t,tid)=>onChange(schedule.map(s=>(s.day===d&&s.time===t)?{...s,teacherId:tid||null}:s));
   return (
     <div style={{overflowX:"auto"}}>
       <table style={{borderCollapse:"collapse",width:"100%",minWidth:"420px"}}>
-        <thead>
-          <tr>
-            <th style={{padding:"4px 6px",color:C.muted,fontSize:"0.66rem",textAlign:"left",width:"52px"}}></th>
-            {DAYS.map(d=><th key={d} style={{padding:"4px 5px",color:C.text2,fontSize:"0.74rem",textAlign:"center",minWidth:"56px",fontWeight:600}}>{d}</th>)}
-          </tr>
-        </thead>
+        <thead><tr><th style={{padding:"4px 6px",color:C.muted,fontSize:"0.66rem",textAlign:"left",width:"52px"}}></th>{DAYS.map(d=><th key={d} style={{padding:"4px 5px",color:C.text2,fontSize:"0.74rem",textAlign:"center",minWidth:"56px",fontWeight:600}}>{d}</th>)}</tr></thead>
         <tbody>
           {TIMES.map(t=>{
-            const isHour = t.endsWith(":00");
+            const isHour=t.endsWith(":00");
             return (
               <tr key={t} style={{borderTop:isHour?`1px solid ${C.border}`:`1px dashed ${C.border}`}}>
                 <td style={{padding:"1px 6px",color:isHour?C.text2:"transparent",fontSize:"0.64rem",whiteSpace:"nowrap",userSelect:"none"}}>{t}</td>
                 {DAYS.map(d=>{
-                  const slot=getSlot(d,t); const active=!!slot;
+                  const slot=getSlot(d,t);const active=!!slot;
                   const teacher=active&&slot.teacherId?teachers?.find(tc=>tc.id===slot.teacherId):null;
                   return (
                     <td key={d} style={{padding:"1px 2px",verticalAlign:"top"}}>
                       <div onClick={()=>tgl(d,t)} style={{width:"100%",height:"22px",borderRadius:isHour?"3px 3px 0 0":"0 0 3px 3px",background:active?(teacher?.color+"22"||"#dbeafe"):"#f8fafc",border:`1.5px solid ${active?(teacher?.color||C.accent):C.border}`,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:"all .1s"}}>
                         {active&&isHour&&<span style={{color:teacher?.color||C.accent,fontSize:"0.5rem",fontWeight:700,padding:"0 1px",overflow:"hidden",whiteSpace:"nowrap"}}>{teacher?teacher.name.slice(0,2):"●"}</span>}
                       </div>
-                      {active&&(
-                        <select value={slot.teacherId||""} onChange={e=>changeTeacher(d,t,e.target.value)} onClick={e=>e.stopPropagation()}
-                          style={{width:"100%",background:C.card2,border:`1px solid ${teacher?.color||C.border}`,borderRadius:"3px",color:C.text,fontSize:"0.6rem",padding:"1px",marginTop:"1px",fontFamily:C.font}}>
-                          <option value="">미배정</option>
-                          {teachers?.map(tc=><option key={tc.id} value={tc.id}>{tc.name}</option>)}
-                        </select>
-                      )}
+                      {active&&(<select value={slot.teacherId||""} onChange={e=>chT(d,t,e.target.value)} onClick={e=>e.stopPropagation()} style={{width:"100%",background:C.card2,border:`1px solid ${teacher?.color||C.border}`,borderRadius:"3px",color:C.text,fontSize:"0.6rem",padding:"1px",marginTop:"1px",fontFamily:C.font}}>
+                        <option value="">미배정</option>{teachers?.map(tc=><option key={tc.id} value={tc.id}>{tc.name}</option>)}
+                      </select>)}
                     </td>
                   );
                 })}
@@ -179,24 +161,16 @@ function StudentScheduleEditor({schedule, onChange, teachers, defaultTeacherId})
   );
 }
 
-/* ── 전체 시간표 (학생 이름 클릭 → 상세 페이지) ── */
+/* ── 전체 시간표 ── */
 function FullSched({teachers, students, onStudentClick}) {
-  const [filterDays,setFilterDays] = useState([...DAYS]);
-  const showDays = DAYS.filter(d=>filterDays.includes(d));
-  const toggleDay = d => setFilterDays(p=>p.includes(d)?p.filter(x=>x!==d):[...p,d]);
-
-  const getTeacher = (s,day,time) => {
-    const sc = s.schedule?.find(sc=>sc.day===day&&sc.time===time);
-    const tid = sc?.teacherId||s.teacherId;
-    return teachers.find(t=>t.id===tid);
-  };
-
+  const [filterDays,setFilterDays]=useState([...DAYS]);
+  const showDays=DAYS.filter(d=>filterDays.includes(d));
+  const toggleDay=d=>setFilterDays(p=>p.includes(d)?p.filter(x=>x!==d):[...p,d]);
+  const getTeacher=(s,day,time)=>{const sc=s.schedule?.find(sc=>sc.day===day&&sc.time===time);return teachers.find(t=>t.id===(sc?.teacherId||s.teacherId));};
   return (
     <div>
       <div style={{display:"flex",gap:"5px",marginBottom:"1rem",flexWrap:"wrap"}}>
-        {DAYS.map(d=>(
-          <button key={d} onClick={()=>toggleDay(d)} style={{border:`1.5px solid ${filterDays.includes(d)?C.accent:C.border}`,borderRadius:"8px",padding:"4px 12px",cursor:"pointer",fontFamily:C.font,fontWeight:600,fontSize:"0.76rem",background:filterDays.includes(d)?C.accent:"#fff",color:filterDays.includes(d)?"#fff":C.text2,transition:"all .15s"}}>{d}</button>
-        ))}
+        {DAYS.map(d=><button key={d} onClick={()=>toggleDay(d)} style={{border:`1.5px solid ${filterDays.includes(d)?C.accent:C.border}`,borderRadius:"8px",padding:"4px 12px",cursor:"pointer",fontFamily:C.font,fontWeight:600,fontSize:"0.76rem",background:filterDays.includes(d)?C.accent:"#fff",color:filterDays.includes(d)?"#fff":C.text2,transition:"all .15s"}}>{d}</button>)}
       </div>
       <div style={{overflowX:"auto"}}>
         <table style={{borderCollapse:"collapse",width:"100%",minWidth:"460px"}}>
@@ -208,31 +182,25 @@ function FullSched({teachers, students, onStudentClick}) {
           </thead>
           <tbody>
             {TIMES.map(time=>{
-              const isHour = time.endsWith(":00");
-              const byday = {};
-              showDays.forEach(d=>{
-                byday[d]=students.filter(s=>s.schedule?.some(sc=>sc.day===d&&sc.time===time)).map(s=>({...s,_teacher:getTeacher(s,d,time)}));
-              });
-              const hasAny = showDays.some(d=>byday[d].length>0);
+              const isHour=time.endsWith(":00");
+              const byday={};
+              showDays.forEach(d=>{byday[d]=students.filter(s=>s.schedule?.some(sc=>sc.day===d&&sc.time===time)).map(s=>({...s,_teacher:getTeacher(s,d,time)}));});
               return (
-                <tr key={time} style={{borderTop:isHour?`1.5px solid ${C.border}`:`1px dashed ${C.border}`,background:isHour&&hasAny?"#fafbff":C.card}}>
+                <tr key={time} style={{borderTop:isHour?`1.5px solid ${C.border}`:`1px dashed ${C.border}`,background:C.card}}>
                   <td style={{padding:"3px 10px",color:isHour?C.text2:"transparent",fontSize:"0.68rem",whiteSpace:"nowrap",background:C.card2,userSelect:"none",fontWeight:isHour?600:400}}>{time}</td>
                   {showDays.map(d=>(
                     <td key={d} style={{padding:"2px 4px",verticalAlign:"top",minWidth:"88px"}}>
-                      {isHour && byday[d].map(s=>(
-                        <div key={s.id}
-                          onClick={()=>onStudentClick(s)}
-                          title={`${s.name} 상세 보기`}
+                      {isHour&&byday[d].map(s=>(
+                        <div key={s.id} onClick={()=>onStudentClick(s)} title={`${s.name} 상세 보기`}
                           style={{background:s._teacher?s._teacher.color+"15":"#eff6ff",borderLeft:`3px solid ${s._teacher?.color||C.accent}`,borderRadius:"6px",padding:"3px 7px",marginBottom:"3px",fontSize:"0.72rem",color:C.text,fontFamily:C.font,lineHeight:1.5,cursor:"pointer",transition:"all .15s",boxShadow:"0 1px 3px rgba(0,0,0,.06)"}}
                           onMouseEnter={e=>{e.currentTarget.style.background=s._teacher?s._teacher.color+"28":"#dbeafe";e.currentTarget.style.transform="translateX(2px)";}}
-                          onMouseLeave={e=>{e.currentTarget.style.background=s._teacher?s._teacher.color+"15":"#eff6ff";e.currentTarget.style.transform="none";}}
-                        >
+                          onMouseLeave={e=>{e.currentTarget.style.background=s._teacher?s._teacher.color+"15":"#eff6ff";e.currentTarget.style.transform="none";}}>
                           <span style={{fontWeight:700,color:s._teacher?.color||C.accent}}>{s.name}</span>
                           <span style={{color:C.muted,marginLeft:"4px",fontSize:"0.64rem"}}>{s.grade}</span>
                           {s._teacher&&<div style={{color:s._teacher.color,fontSize:"0.62rem",opacity:0.8}}>{s._teacher.name}</div>}
                         </div>
                       ))}
-                      {!isHour && byday[d].map(s=>(
+                      {!isHour&&byday[d].map(s=>(
                         <div key={s.id} onClick={()=>onStudentClick(s)} style={{height:"7px",borderRadius:"3px",background:s._teacher?s._teacher.color+"40":"#bfdbfe",marginBottom:"2px",cursor:"pointer"}}/>
                       ))}
                     </td>
@@ -249,20 +217,18 @@ function FullSched({teachers, students, onStudentClick}) {
 
 /* ── 선생님별 시간표 ── */
 function TeacherSched({teacher, students, onStudentClick}) {
-  const getStudentsForSlot = (day,time) => students.filter(s=>{
+  const getStudentsForSlot=(day,time)=>students.filter(s=>{
     const sc=s.schedule?.find(sc=>sc.day===day&&sc.time===time);
     if(!sc) return false;
     return (sc.teacherId||s.teacherId)===teacher.id;
   });
   const myStudents=[...new Map(students.filter(s=>s.schedule?.some(sc=>(sc.teacherId||s.teacherId)===teacher.id)).map(s=>[s.id,s])).values()];
-
   return (
     <div>
       <div style={{display:"flex",gap:"6px",flexWrap:"wrap",marginBottom:"1rem"}}>
         {myStudents.map(s=>(
           <div key={s.id} onClick={()=>onStudentClick(s)} style={{background:teacher.color+"15",borderRadius:"8px",padding:"5px 12px",cursor:"pointer",border:`1px solid ${teacher.color}30`,transition:"all .15s"}}
-            onMouseEnter={e=>e.currentTarget.style.background=teacher.color+"28"}
-            onMouseLeave={e=>e.currentTarget.style.background=teacher.color+"15"}>
+            onMouseEnter={e=>e.currentTarget.style.background=teacher.color+"28"} onMouseLeave={e=>e.currentTarget.style.background=teacher.color+"15"}>
             <span style={{color:teacher.color,fontWeight:700,fontSize:"0.8rem",fontFamily:C.font}}>{s.name}</span>
             <span style={{color:C.muted,fontSize:"0.7rem",marginLeft:"5px",fontFamily:C.font}}>{s.grade}</span>
           </div>
@@ -318,20 +284,16 @@ function PdfModal({teachers, students, onClose}) {
   const [selDays,setSelDays]=useState([...DAYS]);
   const [timeFrom,setTimeFrom]=useState("09:00");
   const [timeTo,setTimeTo]=useState("22:00");
-
   const toggleDay=d=>setSelDays(p=>p.includes(d)?p.filter(x=>x!==d):[...p,d]);
   const showDays=DAYS.filter(d=>selDays.includes(d));
   const showTimes=TIMES.filter(t=>t>=timeFrom&&t<=timeTo);
-
   const getTeacher=(s,day,time)=>{const sc=s.schedule?.find(sc=>sc.day===day&&sc.time===time);return teachers.find(t=>t.id===(sc?.teacherId||s.teacherId));};
-  const getSlots=(day,time)=>{
-    return students.filter(s=>{
-      const sc=s.schedule?.find(sc=>sc.day===day&&sc.time===time);
-      if(!sc) return false;
-      if(selTeacher==="all") return true;
-      return (sc.teacherId||s.teacherId)===selTeacher;
-    }).map(s=>({...s,_teacher:getTeacher(s,day,time)}));
-  };
+  const getSlots=(day,time)=>students.filter(s=>{
+    const sc=s.schedule?.find(sc=>sc.day===day&&sc.time===time);
+    if(!sc) return false;
+    if(selTeacher==="all") return true;
+    return (sc.teacherId||s.teacherId)===selTeacher;
+  }).map(s=>({...s,_teacher:getTeacher(s,day,time)}));
 
   function doPrint(){
     const tName=selTeacher!=="all"?teachers.find(t=>t.id===selTeacher)?.name||"":"전체";
@@ -339,13 +301,12 @@ function PdfModal({teachers, students, onClose}) {
     const html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>시간표</title>
 <style>@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}body{font-family:'Noto Sans KR',sans-serif;padding:20px;background:#fff;color:#1e293b;font-size:11px}
-h2{font-size:15px;margin-bottom:4px;color:#1e293b}p{font-size:10px;color:#94a3b8;margin-bottom:12px}
+h2{font-size:15px;margin-bottom:4px}p{font-size:10px;color:#94a3b8;margin-bottom:12px}
 table{border-collapse:collapse;width:100%}th,td{border:1px solid #e2e8f0;padding:4px 6px;text-align:center;vertical-align:top;min-width:70px}
 th{background:#f8fafc;font-weight:700;font-size:11px;color:#475569}.tc{text-align:left;color:#94a3b8;font-size:10px;white-space:nowrap;min-width:50px;background:#f8fafc}.tc.h{color:#1e293b;font-weight:700}
 .hl{border-top:1px dashed #e2e8f0!important}.sb{border-radius:4px;padding:2px 5px;margin-bottom:2px;text-align:left;font-size:10px;line-height:1.5}.hb{height:5px;border-radius:2px;margin-bottom:2px}
 @media print{body{padding:10px}}</style></head><body>
-<h2>봄 학원 시간표 — ${tName}</h2>
-<p>출력일: ${new Date().toLocaleDateString("ko-KR")}</p>
+<h2>봄 학원 시간표 — ${tName}</h2><p>출력일: ${new Date().toLocaleDateString("ko-KR")}</p>
 <table><thead><tr><th class="tc">시간</th>${showDays.map(d=>`<th>${d}요일</th>`).join("")}</tr></thead>
 <tbody>${showTimes.map(time=>{
   const isHour=time.endsWith(":00");
@@ -399,27 +360,12 @@ th{background:#f8fafc;font-weight:700;font-size:11px;color:#475569}.tc{text-alig
           <tbody>
             {showTimes.map(time=>{
               const isHour=time.endsWith(":00");
-              return (
-                <tr key={time} style={{borderTop:isHour?`1.5px solid ${C.border}`:`1px dashed ${C.border}`}}>
-                  <td style={{padding:"3px 10px",color:isHour?C.text2:"transparent",fontSize:"0.66rem",whiteSpace:"nowrap",background:C.card2,fontWeight:600}}>{time}</td>
-                  {showDays.map(d=>{
-                    const here=getSlots(d,time);
-                    return (
-                      <td key={d} style={{padding:"2px 3px",verticalAlign:"top"}}>
-                        {isHour&&here.map(s=>(
-                          <div key={s.id} style={{background:s._teacher?s._teacher.color+"15":"#eff6ff",borderLeft:`3px solid ${s._teacher?.color||C.accent}`,borderRadius:"4px",padding:"2px 5px",marginBottom:"2px",fontSize:"0.67rem",color:C.text,fontFamily:C.font}}>
-                            <span style={{fontWeight:700,color:s._teacher?.color||C.accent}}>{s.name}</span>
-                            <span style={{color:C.muted,marginLeft:"3px"}}>{s.grade}</span>
-                          </div>
-                        ))}
-                        {!isHour&&here.map(s=>(
-                          <div key={s.id} style={{height:"5px",borderRadius:"2px",background:s._teacher?s._teacher.color+"40":"#bfdbfe",marginBottom:"2px"}}/>
-                        ))}
-                      </td>
-                    );
-                  })}
-                </tr>
-              );
+              return (<tr key={time} style={{borderTop:isHour?`1.5px solid ${C.border}`:`1px dashed ${C.border}`}}>
+                <td style={{padding:"3px 10px",color:isHour?C.text2:"transparent",fontSize:"0.66rem",whiteSpace:"nowrap",background:C.card2,fontWeight:600}}>{time}</td>
+                {showDays.map(d=>{const here=getSlots(d,time);return(<td key={d} style={{padding:"2px 3px",verticalAlign:"top"}}>
+                  {isHour&&here.map(s=>(<div key={s.id} style={{background:s._teacher?s._teacher.color+"15":"#eff6ff",borderLeft:`3px solid ${s._teacher?.color||C.accent}`,borderRadius:"4px",padding:"2px 5px",marginBottom:"2px",fontSize:"0.67rem",color:C.text,fontFamily:C.font}}><span style={{fontWeight:700,color:s._teacher?.color||C.accent}}>{s.name}</span><span style={{color:C.muted,marginLeft:"3px"}}>{s.grade}</span></div>))}
+                  {!isHour&&here.map(s=>(<div key={s.id} style={{height:"5px",borderRadius:"2px",background:s._teacher?s._teacher.color+"40":"#bfdbfe",marginBottom:"2px"}}/>))}
+                </td>);})}</tr>);
             })}
           </tbody>
         </table>
@@ -440,27 +386,47 @@ function exportCSV(filename,headers,rows){
   const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=filename+".csv";a.click();URL.revokeObjectURL(url);
 }
 
-/* ── 레포트 (수정 가능) ── */
+/* ── 레포트 (가나다순 + 검색 + 수정 가능) ── */
 function ReportModal({students, onUpdateRecord}) {
   const now=new Date();
   const [selYM,setSelYM]=useState(`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`);
   const [selSid,setSelSid]=useState("all");
   const [editCell,setEditCell]=useState(null);
-  const targets=selSid==="all"?students:students.filter(s=>s.id===selSid);
+  const [reportSearch,setReportSearch]=useState("");
   const dates=useMemo(()=>monthDates(selYM),[selYM]);
 
-  function doDetail(){const[y,m]=selYM.split("-");const rows=[];targets.forEach(s=>dates.forEach(date=>{const r=s.records?.[date]||{};if(r.att||r.hw||r.memo)rows.push([s.name,s.grade,s.school,date,ATT_LABEL[r.att]||"",r.hw?.toUpperCase()||"",r.memo||""]);})
-  );exportCSV(`출결_숙제_상세_${y}년${m}월`,["이름","학년","학교","날짜","출결","숙제","메모"],rows);}
-  function doSummary(){const[y,m]=selYM.split("-");const rows=targets.map(s=>{const recs=dates.map(d=>s.records?.[d]||{});return[s.name,s.grade,s.school,recs.filter(r=>r.att==="present").length,recs.filter(r=>r.att==="absent").length,recs.filter(r=>r.att==="makeup").length,...HW_OPTS.map(h=>recs.filter(r=>r.hw===h).length)];});exportCSV(`출결_숙제_요약_${y}년${m}월`,["이름","학년","학교","출석","결석","보강","A","B","C","D","N"],rows);}
+  // 학년+이름 가나다순 정렬
+  const sortedStudents = useMemo(()=>sortStudents(students),[students]);
+
+  // 검색 필터
+  const filteredTargets = useMemo(()=>{
+    let base = selSid==="all" ? sortedStudents : sortedStudents.filter(s=>s.id===selSid);
+    if(reportSearch.trim()){
+      const q=reportSearch.toLowerCase();
+      base=base.filter(s=>s.name?.includes(q)||s.school?.toLowerCase().includes(q)||s.grade?.includes(q));
+    }
+    return base;
+  },[selSid, sortedStudents, reportSearch]);
+
+  function doDetail(){
+    const[y,m]=selYM.split("-");const rows=[];
+    filteredTargets.forEach(s=>dates.forEach(date=>{const r=s.records?.[date]||{};if(r.att||r.hw||r.memo)rows.push([s.name,s.grade,s.school,date,ATT_LABEL[r.att]||"",r.hw?.toUpperCase()||"",r.memo||""]);})
+    );exportCSV(`출결_숙제_상세_${y}년${m}월`,["이름","학년","학교","날짜","출결","숙제","메모"],rows);
+  }
+  function doSummary(){
+    const[y,m]=selYM.split("-");
+    const rows=filteredTargets.map(s=>{const recs=dates.map(d=>s.records?.[d]||{});return[s.name,s.grade,s.school,recs.filter(r=>r.att==="present").length,recs.filter(r=>r.att==="absent").length,recs.filter(r=>r.att==="makeup").length,...HW_OPTS.map(h=>recs.filter(r=>r.hw===h).length)];});
+    exportCSV(`출결_숙제_요약_${y}년${m}월`,["이름","학년","학교","출석","결석","보강","A","B","C","D","N"],rows);
+  }
 
   function CellEditor({student, date, onClose}) {
     const rec=student.records?.[date]||{};
-    const [att,setAtt]=useState(rec.att||""); const [hw,setHw]=useState(rec.hw||""); const [memo,setMemo]=useState(rec.memo||"");
+    const [att,setAtt]=useState(rec.att||"");const [hw,setHw]=useState(rec.hw||"");const [memo,setMemo]=useState(rec.memo||"");
     async function save(){const nr={...rec};if(att)nr.att=att;else delete nr.att;if(hw)nr.hw=hw;else delete nr.hw;if(memo)nr.memo=memo;else delete nr.memo;await onUpdateRecord(student.id,date,nr);onClose();}
     async function clear(){await onUpdateRecord(student.id,date,{});onClose();}
     return (
-      <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,.45)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem",backdropFilter:"blur(2px)"}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-        <div style={{background:C.card,borderRadius:"14px",padding:"1.5rem",width:"100%",maxWidth:"340px",border:`1px solid ${C.border}`,boxShadow:"0 20px 50px rgba(0,0,0,.12)"}}>
+      <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,.55)",zIndex:400,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem",backdropFilter:"blur(2px)"}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+        <div style={{background:C.card,borderRadius:"14px",padding:"1.5rem",width:"100%",maxWidth:"340px",border:`1px solid ${C.border}`,boxShadow:"0 20px 50px rgba(0,0,0,.15)"}}>
           <div style={{fontWeight:700,fontSize:"0.95rem",marginBottom:"1rem",fontFamily:C.font,color:C.text}}>✏️ {student.name} — {date}</div>
           <div style={{marginBottom:"1rem"}}>
             <div style={{fontSize:"0.75rem",color:C.text2,marginBottom:"6px",fontFamily:C.font,fontWeight:600}}>출결</div>
@@ -473,9 +439,7 @@ function ReportModal({students, onUpdateRecord}) {
           <div style={{marginBottom:"1rem"}}>
             <div style={{fontSize:"0.75rem",color:C.text2,marginBottom:"6px",fontFamily:C.font,fontWeight:600}}>숙제</div>
             <div style={{display:"flex",gap:"5px"}}>
-              {HW_OPTS.map(h=>(
-                <button key={h} onClick={()=>setHw(hw===h?"":h)} style={{flex:1,border:`2px solid ${hw===h?HW_COLOR[h]:C.border}`,borderRadius:"7px",padding:"6px 2px",background:hw===h?HW_COLOR[h]+"18":"#fff",color:hw===h?HW_COLOR[h]:C.muted,cursor:"pointer",fontFamily:C.font,fontWeight:800,fontSize:"0.88rem"}}>{h.toUpperCase()}</button>
-              ))}
+              {HW_OPTS.map(h=><button key={h} onClick={()=>setHw(hw===h?"":h)} style={{flex:1,border:`2px solid ${hw===h?HW_COLOR[h]:C.border}`,borderRadius:"7px",padding:"6px 2px",background:hw===h?HW_COLOR[h]+"18":"#fff",color:hw===h?HW_COLOR[h]:C.muted,cursor:"pointer",fontFamily:C.font,fontWeight:800,fontSize:"0.88rem"}}>{h.toUpperCase()}</button>)}
             </div>
           </div>
           <div style={{marginBottom:"1rem"}}>
@@ -495,27 +459,45 @@ function ReportModal({students, onUpdateRecord}) {
   return (
     <div>
       {editCell&&<CellEditor student={students.find(s=>s.id===editCell.sid)} date={editCell.date} onClose={()=>setEditCell(null)}/>}
-      <div style={{display:"flex",gap:"8px",marginBottom:"1.25rem",flexWrap:"wrap",alignItems:"center"}}>
+
+      {/* 컨트롤 바 */}
+      <div style={{display:"flex",gap:"8px",marginBottom:"1rem",flexWrap:"wrap",alignItems:"center"}}>
         <input type="month" value={selYM} onChange={e=>setSelYM(e.target.value)} style={{background:C.card2,border:`1.5px solid ${C.border}`,borderRadius:"8px",padding:"7px 10px",color:C.text,fontSize:"0.875rem",outline:"none",fontFamily:C.font}}/>
-        <select value={selSid} onChange={e=>setSelSid(e.target.value)} style={{background:C.card2,border:`1.5px solid ${C.border}`,borderRadius:"8px",padding:"7px 10px",color:C.text,fontSize:"0.875rem",outline:"none",fontFamily:C.font}}>
-          <option value="all">전체 원생</option>{students.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+        <select value={selSid} onChange={e=>{setSelSid(e.target.value);setReportSearch("");}} style={{background:C.card2,border:`1.5px solid ${C.border}`,borderRadius:"8px",padding:"7px 10px",color:C.text,fontSize:"0.875rem",outline:"none",fontFamily:C.font}}>
+          <option value="all">전체 원생</option>
+          {sortedStudents.map(s=><option key={s.id} value={s.id}>{s.name} ({s.grade})</option>)}
         </select>
         <div style={{marginLeft:"auto",display:"flex",gap:"6px"}}>
           <Btn sm v="success" onClick={doSummary}>📊 요약 엑셀</Btn>
           <Btn sm onClick={doDetail}>📥 상세 엑셀</Btn>
         </div>
       </div>
+
+      {/* 검색창 (전체 원생 선택 시에만 표시) */}
+      {selSid==="all"&&(
+        <input value={reportSearch} onChange={e=>setReportSearch(e.target.value)}
+          placeholder="🔍 이름·학교·학년 검색"
+          style={{width:"100%",background:C.card2,border:`1.5px solid ${C.border}`,borderRadius:"8px",padding:"8px 14px",color:C.text,fontSize:"0.875rem",outline:"none",fontFamily:C.font,boxSizing:"border-box",marginBottom:"0.75rem"}}
+          onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}/>
+      )}
+
       <div style={{fontSize:"0.72rem",color:C.muted,marginBottom:"0.75rem",fontFamily:C.font,background:"#fff7ed",padding:"8px 12px",borderRadius:"8px",border:"1px solid #fed7aa"}}>
-        💡 날짜 칸을 클릭하면 출결/숙제를 직접 수정할 수 있어요
+        💡 날짜 칸을 클릭하면 출결/숙제를 직접 수정할 수 있어요 · 학년+이름 가나다순 정렬
       </div>
-      {targets.map(s=>{
+
+      {filteredTargets.length===0&&<div style={{textAlign:"center",color:C.muted,padding:"2rem",fontFamily:C.font}}>검색 결과가 없습니다</div>}
+
+      {filteredTargets.map(s=>{
         const recs=dates.map(d=>({date:d,...(s.records?.[d]||{})}));
         return(
           <div key={s.id} style={{background:C.card2,borderRadius:"12px",padding:"1rem",marginBottom:"1rem",border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(0,0,0,.05)"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"0.75rem",flexWrap:"wrap",gap:"6px"}}>
               <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
-                <span style={{fontWeight:700,fontSize:"0.95rem",fontFamily:C.font,color:C.text}}>{s.name}</span>
-                <span style={{color:C.muted,fontSize:"0.76rem",fontFamily:C.font}}>{s.grade} · {s.school}</span>
+                <div style={{width:"32px",height:"32px",borderRadius:"50%",background:C.accent+"18",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,color:C.accent,fontSize:"0.85rem"}}>{s.name[0]}</div>
+                <div>
+                  <span style={{fontWeight:700,fontSize:"0.95rem",fontFamily:C.font,color:C.text}}>{s.name}</span>
+                  <span style={{color:C.muted,fontSize:"0.76rem",fontFamily:C.font,marginLeft:"6px"}}>{s.grade} · {s.school}</span>
+                </div>
               </div>
               <div style={{display:"flex",gap:"5px",flexWrap:"wrap"}}>
                 <Tag c="#10b981">출석 {recs.filter(r=>r.att==="present").length}</Tag>
@@ -528,7 +510,7 @@ function ReportModal({students, onUpdateRecord}) {
               {recs.map(({date,att,hw,memo})=>(
                 <div key={date} onClick={()=>setEditCell({sid:s.id,date})} title={`${date} 클릭하여 수정`}
                   style={{width:"34px",height:"48px",borderRadius:"7px",background:att?ATT_COLOR[att]+"12":"#fff",border:`1.5px solid ${att?ATT_COLOR[att]:C.border}`,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:"2px",cursor:"pointer",transition:"all .15s",boxShadow:"0 1px 2px rgba(0,0,0,.06)"}}
-                  onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-1px)";e.currentTarget.style.boxShadow="0 3px 8px rgba(0,0,0,.1)";}}
+                  onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 4px 10px rgba(0,0,0,.1)";}}
                   onMouseLeave={e=>{e.currentTarget.style.transform="none";e.currentTarget.style.boxShadow="0 1px 2px rgba(0,0,0,.06)";}}>
                   <div style={{fontSize:"0.6rem",color:C.muted,fontFamily:C.font}}>{date.slice(8)}</div>
                   {att&&<div style={{width:"16px",height:"16px",borderRadius:"50%",background:ATT_COLOR[att],display:"flex",alignItems:"center",justifyContent:"center",fontSize:"0.54rem",color:"#fff",fontWeight:700}}>{att==="present"?"출":att==="absent"?"결":"보"}</div>}
@@ -546,8 +528,8 @@ function ReportModal({students, onUpdateRecord}) {
 
 /* ── 원생 상세 ── */
 function StudentDetail({student, teacher, onEdit, onDelete, onUpdateRecord}) {
-  const td=today(); const rec=student.records?.[td]||{};
-  const [hw,setHw]=useState(rec.hw||""); const [memo,setMemo]=useState(rec.memo||""); const [saved,setSaved]=useState(false);
+  const td=today();const rec=student.records?.[td]||{};
+  const [hw,setHw]=useState(rec.hw||"");const [memo,setMemo]=useState(rec.memo||"");const [saved,setSaved]=useState(false);
   const curAtt=student.records?.[td]?.att;
   function saveRec(att){onUpdateRecord(student.id,td,{...(student.records?.[td]||{}),att,hw:hw||(student.records?.[td]?.hw||""),memo:memo||(student.records?.[td]?.memo||"")});}
   function saveHwMemo(){onUpdateRecord(student.id,td,{...(student.records?.[td]||{}),hw,memo});setSaved(true);setTimeout(()=>setSaved(false),2000);}
@@ -567,7 +549,6 @@ function StudentDetail({student, teacher, onEdit, onDelete, onUpdateRecord}) {
       </div>
       {student.textbooks&&<div style={{background:C.card2,borderRadius:"10px",padding:"0.7rem 0.9rem",marginBottom:"8px",border:`1px solid ${C.border}`}}><div style={{color:C.muted,fontSize:"0.68rem",marginBottom:"3px",fontFamily:C.font,fontWeight:600}}>교재</div><div style={{color:C.text,fontSize:"0.88rem",fontFamily:C.font}}>{student.textbooks}</div></div>}
       {student.memo&&<div style={{background:C.card2,borderRadius:"10px",padding:"0.7rem 0.9rem",marginBottom:"8px",border:`1px solid ${C.border}`}}><div style={{color:C.muted,fontSize:"0.68rem",marginBottom:"3px",fontFamily:C.font,fontWeight:600}}>메모</div><div style={{color:C.text,fontSize:"0.88rem",fontFamily:C.font}}>{student.memo}</div></div>}
-
       <div style={{background:curAtt?ATT_COLOR[curAtt]+"08":"#f0f9ff",borderRadius:"12px",padding:"1.1rem",marginBottom:"12px",border:`2px solid ${curAtt?ATT_COLOR[curAtt]:C.border}`}}>
         <div style={{fontWeight:700,fontSize:"0.9rem",marginBottom:"1rem",fontFamily:C.font,display:"flex",alignItems:"center",gap:"8px",color:C.text}}>
           📅 오늘 기록 <span style={{color:C.muted,fontWeight:400,fontSize:"0.78rem"}}>{td}</span>
@@ -582,11 +563,9 @@ function StudentDetail({student, teacher, onEdit, onDelete, onUpdateRecord}) {
           </div>
         </div>
         <div style={{marginBottom:"1rem"}}>
-          <div style={{fontSize:"0.75rem",color:C.text2,marginBottom:"6px",fontFamily:C.font,fontWeight:600}}>오늘 숙제 (A:완료 B:대부분 C:절반 D:미흡 N:미제출)</div>
+          <div style={{fontSize:"0.75rem",color:C.text2,marginBottom:"6px",fontFamily:C.font,fontWeight:600}}>오늘 숙제</div>
           <div style={{display:"flex",gap:"5px",marginBottom:"4px"}}>
-            {HW_OPTS.map(h=>(
-              <button key={h} onClick={()=>setHw(hw===h?"":h)} style={{flex:1,border:`2px solid ${hw===h?HW_COLOR[h]:C.border}`,borderRadius:"8px",padding:"7px 2px",background:hw===h?HW_COLOR[h]+"18":"#fff",color:hw===h?HW_COLOR[h]:C.muted,cursor:"pointer",fontFamily:C.font,fontWeight:800,fontSize:"0.9rem",transition:"all .15s"}}>{h.toUpperCase()}</button>
-            ))}
+            {HW_OPTS.map(h=><button key={h} onClick={()=>setHw(hw===h?"":h)} style={{flex:1,border:`2px solid ${hw===h?HW_COLOR[h]:C.border}`,borderRadius:"8px",padding:"7px 2px",background:hw===h?HW_COLOR[h]+"18":"#fff",color:hw===h?HW_COLOR[h]:C.muted,cursor:"pointer",fontFamily:C.font,fontWeight:800,fontSize:"0.9rem",transition:"all .15s"}}>{h.toUpperCase()}</button>)}
           </div>
           {hw&&<div style={{fontSize:"0.74rem",color:HW_COLOR[hw],fontFamily:C.font,fontWeight:600}}>{HW_DESC[hw]}</div>}
         </div>
@@ -599,12 +578,11 @@ function StudentDetail({student, teacher, onEdit, onDelete, onUpdateRecord}) {
           {saved&&<span style={{color:"#10b981",fontSize:"0.78rem",fontFamily:C.font,fontWeight:600}}>저장됨 ✓</span>}
         </div>
       </div>
-
       <div style={{background:C.card2,borderRadius:"12px",padding:"1rem",border:`1px solid ${C.border}`}}>
         <div style={{fontWeight:700,fontSize:"0.88rem",marginBottom:"0.75rem",fontFamily:C.font,color:C.text}}>📋 최근 기록</div>
         <div style={{display:"flex",gap:"4px",flexWrap:"wrap"}}>
           {Object.entries(student.records||{}).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,20).map(([date,r])=>(
-            <div key={date} style={{background:r.att?ATT_COLOR[r.att]+"12":"#fff",borderRadius:"8px",padding:"5px 8px",border:`1.5px solid ${r.att?ATT_COLOR[r.att]:C.border}`,minWidth:"50px",textAlign:"center",boxShadow:"0 1px 3px rgba(0,0,0,.05)"}}>
+            <div key={date} style={{background:r.att?ATT_COLOR[r.att]+"12":"#fff",borderRadius:"8px",padding:"5px 8px",border:`1.5px solid ${r.att?ATT_COLOR[r.att]:C.border}`,minWidth:"50px",textAlign:"center"}}>
               <div style={{fontSize:"0.62rem",color:C.muted,fontFamily:C.font}}>{date.slice(5)}</div>
               <div style={{display:"flex",gap:"3px",justifyContent:"center",marginTop:"2px"}}>
                 {r.att&&<span style={{fontSize:"0.64rem",fontWeight:700,color:ATT_COLOR[r.att]}}>{r.att==="present"?"출":r.att==="absent"?"결":"보"}</span>}
@@ -624,10 +602,7 @@ function StudentForm({init, teachers, onSave, onClose}) {
   const blank={id:`s_${Date.now()}`,name:"",grade:GRADES[0],school:"",subject:SUBJECTS[0],textbooks:"",memo:"",teacherId:null,schedule:[],records:{}};
   const [f,sf]=useState(init||blank);
   const s=(k,v)=>sf(p=>({...p,[k]:v}));
-  const handleTeacherChange=(tid)=>{
-    const updatedSchedule=(f.schedule||[]).map(sc=>!sc.teacherId?{...sc,teacherId:tid||null}:sc);
-    sf(p=>({...p,teacherId:tid||null,schedule:updatedSchedule}));
-  };
+  const handleTeacherChange=(tid)=>{const upd=(f.schedule||[]).map(sc=>!sc.teacherId?{...sc,teacherId:tid||null}:sc);sf(p=>({...p,teacherId:tid||null,schedule:upd}));};
   return (
     <div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.5rem"}}>
@@ -645,7 +620,7 @@ function StudentForm({init, teachers, onSave, onClose}) {
         <textarea value={f.memo} onChange={e=>s("memo",e.target.value)} rows={2} style={{width:"100%",background:C.card2,border:`1.5px solid ${C.border}`,borderRadius:"8px",padding:"8px 12px",color:C.text,fontSize:"0.875rem",outline:"none",boxSizing:"border-box",fontFamily:C.font,resize:"vertical"}}/>
       </div>
       <div style={{marginBottom:"0.9rem"}}>
-        <div style={{fontSize:"0.75rem",color:C.text2,marginBottom:"6px",fontFamily:C.font,fontWeight:600}}>시간표 — 클릭으로 추가, 드롭다운으로 선생님 개별 지정</div>
+        <div style={{fontSize:"0.75rem",color:C.text2,marginBottom:"6px",fontFamily:C.font,fontWeight:600}}>시간표</div>
         <StudentScheduleEditor schedule={f.schedule||[]} onChange={v=>s("schedule",v)} teachers={teachers} defaultTeacherId={f.teacherId}/>
       </div>
       <div style={{display:"flex",gap:"8px",justifyContent:"flex-end"}}>
@@ -668,7 +643,7 @@ function TeacherForm({init, onSave, onClose}) {
       <div style={{marginBottom:"0.9rem"}}>
         <div style={{fontSize:"0.75rem",color:C.text2,marginBottom:"6px",fontFamily:C.font,fontWeight:600}}>대표 색상</div>
         <div style={{display:"flex",gap:"8px",flexWrap:"wrap"}}>
-          {TCOLORS.map(c=><div key={c} onClick={()=>s("color",c)} style={{width:"30px",height:"30px",borderRadius:"50%",background:c,cursor:"pointer",border:f.color===c?"3px solid #1e293b":"3px solid transparent",boxShadow:f.color===c?"0 0 0 2px #fff,0 0 0 4px "+c:"none",transition:"all .15s"}}/>)}
+          {TCOLORS.map(c=><div key={c} onClick={()=>s("color",c)} style={{width:"30px",height:"30px",borderRadius:"50%",background:c,cursor:"pointer",border:f.color===c?"3px solid #1e293b":"3px solid transparent",boxShadow:f.color===c?`0 0 0 2px #fff,0 0 0 4px ${c}`:"none",transition:"all .15s"}}/>)}
         </div>
       </div>
       <div style={{display:"flex",gap:"8px",justifyContent:"flex-end"}}>
@@ -687,11 +662,22 @@ export default function App() {
   const [tab,setTab]=useState("schedule");
   const [schedView,setSchedView]=useState("full");
   const [tvId,setTvId]=useState(null);
-  const [selS,setSelS]=useState(null); const [editS,setEditS]=useState(null); const [addS,setAddS]=useState(false);
-  const [selT,setSelT]=useState(null); const [editT,setEditT]=useState(null); const [addT,setAddT]=useState(false);
+
+  // 모달 스택: 여러 모달이 겹칠 때 zIndex 제어
+  const [selS,setSelS]=useState(null);
+  const [editS,setEditS]=useState(null);
+  const [addS,setAddS]=useState(false);
+  const [selT,setSelT]=useState(null);
+  const [editT,setEditT]=useState(null);
+  const [addT,setAddT]=useState(false);
   const [showReport,setShowReport]=useState(false);
   const [showPdf,setShowPdf]=useState(false);
-  const [search,setSearch]=useState(""); const [fT,setFT]=useState("all"); const [fSub,setFSub]=useState("all");
+  // 시간표 모달 위에 학생 상세가 뜰 때를 위한 별도 상태
+  const [scheduleStudentModal,setScheduleStudentModal]=useState(null);
+
+  const [search,setSearch]=useState("");
+  const [fT,setFT]=useState("all");
+  const [fSub,setFSub]=useState("all");
 
   useEffect(()=>{return onAuthStateChanged(auth,u=>setUser(u||null));},[]);
   useEffect(()=>{
@@ -703,19 +689,36 @@ export default function App() {
 
   const saveStudent=async s=>setDoc(doc(db,"students",s.id),s);
   const saveTeacher=async t=>setDoc(doc(db,"teachers",t.id),t);
-  const delStudent=async id=>{if(confirm("원생을 삭제할까요?")){await deleteDoc(doc(db,"students",id));setSelS(null);}};
+  const delStudent=async id=>{if(confirm("원생을 삭제할까요?")){await deleteDoc(doc(db,"students",id));setSelS(null);setScheduleStudentModal(null);}};
   const delTeacher=async id=>{if(confirm("선생님을 삭제할까요?")){await deleteDoc(doc(db,"teachers",id));for(const s of students.filter(s=>s.teacherId===id))await setDoc(doc(db,"students",s.id),{...s,teacherId:null});setSelT(null);}};
   const updateRecord=async(sid,date,rec)=>{const s=students.find(x=>x.id===sid);if(!s)return;await setDoc(doc(db,"students",sid),{...s,records:{...(s.records||{}),[date]:rec}});};
 
-  // 시간표에서 학생 이름 클릭 시 상세 열기
-  const handleStudentClick = (s) => { setSelS(s); setTab("students"); };
+  // 시간표에서 학생 클릭 → 별도 고zIndex 모달
+  const handleStudentClick=(s)=>setScheduleStudentModal(s);
+  // 원생 탭에서 클릭
+  const handleStudentTabClick=(s)=>{setSelS(s);};
 
-  const filtered=students.filter(s=>{const q=search.toLowerCase();return(!q||s.name?.includes(q)||s.school?.toLowerCase().includes(q)||s.grade?.includes(q))&&(fT==="all"||s.teacherId===fT)&&(fSub==="all"||s.subject===fSub);});
-  const td=today(); const todayAtts=students.map(s=>s.records?.[td]?.att).filter(Boolean);
+  // 학년+이름 정렬된 원생 목록
+  const sortedStudents = useMemo(()=>sortStudents(students),[students]);
+
+  const filtered=useMemo(()=>{
+    const q=search.toLowerCase();
+    return sortedStudents.filter(s=>
+      (!q||s.name?.includes(q)||s.school?.toLowerCase().includes(q)||s.grade?.includes(q))
+      &&(fT==="all"||s.teacherId===fT)
+      &&(fSub==="all"||s.subject===fSub)
+    );
+  },[sortedStudents,search,fT,fSub]);
+
+  const td=today();
+  const todayAtts=students.map(s=>s.records?.[td]?.att).filter(Boolean);
   const TABS=[{id:"schedule",l:"📅 시간표"},{id:"students",l:"👨‍🎓 원생"},{id:"teachers",l:"👩‍🏫 선생님"}];
 
   if(user===undefined) return <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",justifyContent:"center",color:C.muted,fontFamily:C.font}}>로딩 중...</div>;
   if(!user) return <LoginScreen/>;
+
+  // 시간표 선생님 모달 안에서 쓰는 현재 학생 데이터
+  const schedStudentData = scheduleStudentModal ? students.find(s=>s.id===scheduleStudentModal.id)||scheduleStudentModal : null;
 
   return (
     <div style={{minHeight:"100vh",background:C.bg,color:C.text,fontFamily:C.font}}>
@@ -733,24 +736,20 @@ export default function App() {
           <div style={{marginLeft:"auto",display:"flex",gap:"8px",alignItems:"center"}}>
             <Btn sm v="ghost" onClick={()=>setShowPdf(true)}>🖨️ 시간표 PDF</Btn>
             <Btn sm v="purple" onClick={()=>setShowReport(true)}>📊 레포트</Btn>
-            <span style={{fontSize:"0.72rem",color:C.muted,fontFamily:C.font}}>👤 {user.email}</span>
-            <button onClick={()=>signOut(auth)} style={{background:"#fff",border:`1px solid ${C.border}`,borderRadius:"7px",padding:"4px 12px",color:C.text2,cursor:"pointer",fontSize:"0.72rem",fontFamily:C.font,transition:"all .15s"}}
-              onMouseEnter={e=>e.currentTarget.style.background=C.bg}
-              onMouseLeave={e=>e.currentTarget.style.background="#fff"}>로그아웃</button>
+            <span style={{fontSize:"0.72rem",color:C.muted}}>{user.email}</span>
+            <button onClick={()=>signOut(auth)} style={{background:"#fff",border:`1px solid ${C.border}`,borderRadius:"7px",padding:"4px 12px",color:C.text2,cursor:"pointer",fontSize:"0.72rem",fontFamily:C.font}}
+              onMouseEnter={e=>e.currentTarget.style.background=C.bg} onMouseLeave={e=>e.currentTarget.style.background="#fff"}>로그아웃</button>
           </div>
         </div>
       </header>
 
       <main style={{maxWidth:"1300px",margin:"0 auto",padding:"1.25rem"}}>
-        {/* 통계 카드 */}
+        {/* 통계 */}
         <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:"12px",marginBottom:"1.25rem"}}>
           {[{l:"전체 원생",v:`${students.length}명`,icon:"👨‍🎓",c:"#3b82f6",bg:"#eff6ff"},{l:"선생님",v:`${teachers.length}명`,icon:"👩‍🏫",c:"#8b5cf6",bg:"#f5f3ff"},{l:"오늘 출석",v:`${todayAtts.filter(a=>a==="present").length}명`,icon:"✅",c:"#10b981",bg:"#f0fdf4"},{l:"오늘 결석",v:`${todayAtts.filter(a=>a==="absent").length}명`,icon:"❌",c:"#ef4444",bg:"#fef2f2"}].map(({l,v,icon,c,bg})=>(
             <div key={l} style={{background:C.card,borderRadius:"12px",padding:"1rem 1.1rem",border:`1px solid ${C.border}`,boxShadow:"0 1px 4px rgba(0,0,0,.05)"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-                <div>
-                  <div style={{color:C.muted,fontSize:"0.72rem",marginBottom:"5px",fontWeight:600}}>{l}</div>
-                  <div style={{fontWeight:800,fontSize:"1.1rem",color:c}}>{v}</div>
-                </div>
+                <div><div style={{color:C.muted,fontSize:"0.72rem",marginBottom:"5px",fontWeight:600}}>{l}</div><div style={{fontWeight:800,fontSize:"1.1rem",color:c}}>{v}</div></div>
                 <div style={{width:"36px",height:"36px",borderRadius:"10px",background:bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.1rem"}}>{icon}</div>
               </div>
             </div>
@@ -773,11 +772,12 @@ export default function App() {
               {schedView==="byTeacher"&&(
                 <div>
                   <div style={{display:"flex",gap:"6px",marginBottom:"1rem",flexWrap:"wrap"}}>
-                    {teachers.map(t=>(
-                      <button key={t.id} onClick={()=>setTvId(t.id)} style={{border:`2px solid ${tvId===t.id?t.color:C.border}`,borderRadius:"9px",padding:"5px 16px",cursor:"pointer",fontFamily:C.font,fontWeight:600,fontSize:"0.8rem",background:tvId===t.id?t.color+"15":"#fff",color:tvId===t.id?t.color:C.text2,transition:"all .15s"}}>{t.name}</button>
-                    ))}
+                    {teachers.map(t=><button key={t.id} onClick={()=>setTvId(t.id)} style={{border:`2px solid ${tvId===t.id?t.color:C.border}`,borderRadius:"9px",padding:"5px 16px",cursor:"pointer",fontFamily:C.font,fontWeight:600,fontSize:"0.8rem",background:tvId===t.id?t.color+"15":"#fff",color:tvId===t.id?t.color:C.text2,transition:"all .15s"}}>{t.name}</button>)}
                   </div>
-                  {tvId?<TeacherSched teacher={teachers.find(x=>x.id===tvId)} students={students} onStudentClick={handleStudentClick}/>:<div style={{color:C.muted,textAlign:"center",padding:"3rem",fontFamily:C.font}}>선생님을 선택하세요</div>}
+                  {tvId
+                    ? <TeacherSched teacher={teachers.find(x=>x.id===tvId)} students={students} onStudentClick={handleStudentClick}/>
+                    : <div style={{color:C.muted,textAlign:"center",padding:"3rem"}}>선생님을 선택하세요</div>
+                  }
                 </div>
               )}
             </div>
@@ -788,7 +788,7 @@ export default function App() {
         {tab==="students"&&(
           <div>
             <div style={{display:"flex",gap:"8px",marginBottom:"1rem",flexWrap:"wrap"}}>
-              <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 이름·학교·학년 검색" style={{flex:1,minWidth:"150px",background:C.card,border:`1.5px solid ${C.border}`,borderRadius:"10px",padding:"8px 14px",color:C.text,fontSize:"0.875rem",outline:"none",fontFamily:C.font,boxShadow:"0 1px 3px rgba(0,0,0,.05)"}}
+              <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 이름·학교·학년 검색" style={{flex:1,minWidth:"150px",background:C.card,border:`1.5px solid ${C.border}`,borderRadius:"10px",padding:"8px 14px",color:C.text,fontSize:"0.875rem",outline:"none",fontFamily:C.font}}
                 onFocus={e=>e.target.style.borderColor=C.accent} onBlur={e=>e.target.style.borderColor=C.border}/>
               <select value={fT} onChange={e=>setFT(e.target.value)} style={{background:C.card,border:`1.5px solid ${C.border}`,borderRadius:"10px",padding:"8px 12px",color:C.text,fontSize:"0.875rem",outline:"none",fontFamily:C.font}}>
                 <option value="all">전체 선생님</option>{teachers.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
@@ -800,17 +800,14 @@ export default function App() {
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:"12px"}}>
               {filtered.map(st=>{
-                const teacher=teachers.find(t=>t.id===st.teacherId); const tr=st.records?.[td]||{};
+                const teacher=teachers.find(t=>t.id===st.teacherId);const tr=st.records?.[td]||{};
                 return (
-                  <div key={st.id} onClick={()=>setSelS(st)} style={{background:C.card,borderRadius:"13px",padding:"1.1rem",border:`1px solid ${C.border}`,cursor:"pointer",position:"relative",overflow:"hidden",transition:"all .2s",boxShadow:"0 1px 4px rgba(0,0,0,.06)"}}
+                  <div key={st.id} onClick={()=>handleStudentTabClick(st)} style={{background:C.card,borderRadius:"13px",padding:"1.1rem",border:`1px solid ${C.border}`,cursor:"pointer",position:"relative",overflow:"hidden",transition:"all .2s",boxShadow:"0 1px 4px rgba(0,0,0,.06)"}}
                     onMouseEnter={e=>{e.currentTarget.style.borderColor=teacher?.color||C.accent;e.currentTarget.style.transform="translateY(-3px)";e.currentTarget.style.boxShadow="0 8px 20px rgba(0,0,0,.1)";}}
                     onMouseLeave={e=>{e.currentTarget.style.borderColor=C.border;e.currentTarget.style.transform="none";e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,.06)";}}>
                     <div style={{position:"absolute",top:0,left:0,right:0,height:"4px",background:teacher?.color||C.accent,borderRadius:"13px 13px 0 0"}}/>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"6px"}}>
-                      <div>
-                        <div style={{fontWeight:700,fontSize:"0.95rem",color:C.text}}>{st.name}</div>
-                        <div style={{color:C.muted,fontSize:"0.72rem"}}>{st.grade} · {st.school}</div>
-                      </div>
+                      <div><div style={{fontWeight:700,fontSize:"0.95rem",color:C.text}}>{st.name}</div><div style={{color:C.muted,fontSize:"0.72rem"}}>{st.grade} · {st.school}</div></div>
                       {tr.att&&<Tag c={ATT_COLOR[tr.att]}>{ATT_LABEL[tr.att]}</Tag>}
                     </div>
                     <div style={{marginBottom:"6px",display:"flex",gap:"4px",flexWrap:"wrap"}}>
@@ -859,15 +856,44 @@ export default function App() {
         )}
       </main>
 
-      {/* 모달 */}
-      {selS&&!editS&&(<Modal title={`${selS.name} 원생 상세`} onClose={()=>setSelS(null)} wide><StudentDetail student={students.find(s=>s.id===selS.id)||selS} teacher={teachers.find(t=>t.id===selS.teacherId)} onEdit={()=>setEditS(students.find(s=>s.id===selS.id))} onDelete={()=>delStudent(selS.id)} onUpdateRecord={updateRecord}/></Modal>)}
-      {editS&&(<Modal title="원생 정보 수정" onClose={()=>setEditS(null)} wide><StudentForm init={editS} teachers={teachers} onSave={saveStudent} onClose={()=>{setEditS(null);setSelS(null);}}/></Modal>)}
-      {addS&&(<Modal title="원생 추가" onClose={()=>setAddS(false)} wide><StudentForm teachers={teachers} onSave={saveStudent} onClose={()=>setAddS(false)}/></Modal>)}
-      {selT&&!editT&&(<Modal title={`${selT.name} 시간표`} onClose={()=>setSelT(null)} wide><div style={{display:"flex",gap:"6px",marginBottom:"1rem"}}><Btn sm onClick={()=>setEditT(selT)}>✏️ 정보 수정</Btn><Btn sm v="danger" onClick={()=>delTeacher(selT.id)}>🗑️ 삭제</Btn></div><TeacherSched teacher={selT} students={students} onStudentClick={handleStudentClick}/></Modal>)}
-      {editT&&(<Modal title="선생님 정보 수정" onClose={()=>setEditT(null)}><TeacherForm init={editT} onSave={saveTeacher} onClose={()=>{setEditT(null);setSelT(null);}}/></Modal>)}
-      {addT&&(<Modal title="선생님 추가" onClose={()=>setAddT(false)}><TeacherForm onSave={saveTeacher} onClose={()=>setAddT(false)}/></Modal>)}
-      {showReport&&(<Modal title="📊 월별 출결·숙제 레포트" onClose={()=>setShowReport(false)} wide><ReportModal students={students} onUpdateRecord={updateRecord}/></Modal>)}
-      {showPdf&&(<Modal title="🖨️ 시간표 PDF 출력" onClose={()=>setShowPdf(false)} wide><PdfModal teachers={teachers} students={students} onClose={()=>setShowPdf(false)}/></Modal>)}
+      {/* ── 모달들 ── */}
+
+      {/* 원생 탭 상세 (zIndex 200) */}
+      {selS&&!editS&&(
+        <Modal title={`${selS.name} 원생 상세`} onClose={()=>setSelS(null)} wide zIndex={200}>
+          <StudentDetail student={students.find(s=>s.id===selS.id)||selS} teacher={teachers.find(t=>t.id===selS.teacherId)}
+            onEdit={()=>setEditS(students.find(s=>s.id===selS.id))} onDelete={()=>delStudent(selS.id)} onUpdateRecord={updateRecord}/>
+        </Modal>
+      )}
+      {editS&&(<Modal title="원생 정보 수정" onClose={()=>setEditS(null)} wide zIndex={210}><StudentForm init={editS} teachers={teachers} onSave={saveStudent} onClose={()=>{setEditS(null);setSelS(null);}}/></Modal>)}
+      {addS&&(<Modal title="원생 추가" onClose={()=>setAddS(false)} wide zIndex={200}><StudentForm teachers={teachers} onSave={saveStudent} onClose={()=>setAddS(false)}/></Modal>)}
+
+      {/* 선생님 시간표 모달 (zIndex 200) */}
+      {selT&&!editT&&(
+        <Modal title={`${selT.name} 시간표`} onClose={()=>setSelT(null)} wide zIndex={200}>
+          <div style={{display:"flex",gap:"6px",marginBottom:"1rem"}}>
+            <Btn sm onClick={()=>setEditT(selT)}>✏️ 정보 수정</Btn>
+            <Btn sm v="danger" onClick={()=>delTeacher(selT.id)}>🗑️ 삭제</Btn>
+          </div>
+          <TeacherSched teacher={selT} students={students} onStudentClick={handleStudentClick}/>
+        </Modal>
+      )}
+      {editT&&(<Modal title="선생님 정보 수정" onClose={()=>setEditT(null)} zIndex={210}><TeacherForm init={editT} onSave={saveTeacher} onClose={()=>{setEditT(null);setSelT(null);}}/></Modal>)}
+      {addT&&(<Modal title="선생님 추가" onClose={()=>setAddT(false)} zIndex={200}><TeacherForm onSave={saveTeacher} onClose={()=>setAddT(false)}/></Modal>)}
+
+      {/* 시간표에서 학생 클릭 시 → zIndex 300 (선생님 모달 위에) */}
+      {schedStudentData&&(
+        <Modal title={`${schedStudentData.name} 원생 상세`} onClose={()=>setScheduleStudentModal(null)} wide zIndex={300}>
+          <StudentDetail student={schedStudentData} teacher={teachers.find(t=>t.id===schedStudentData.teacherId)}
+            onEdit={()=>{setEditS(schedStudentData);setScheduleStudentModal(null);}}
+            onDelete={()=>delStudent(schedStudentData.id)}
+            onUpdateRecord={updateRecord}/>
+        </Modal>
+      )}
+
+      {/* 레포트 / PDF */}
+      {showReport&&(<Modal title="📊 월별 출결·숙제 레포트" onClose={()=>setShowReport(false)} wide zIndex={200}><ReportModal students={students} onUpdateRecord={updateRecord}/></Modal>)}
+      {showPdf&&(<Modal title="🖨️ 시간표 PDF 출력" onClose={()=>setShowPdf(false)} wide zIndex={200}><PdfModal teachers={teachers} students={students} onClose={()=>setShowPdf(false)}/></Modal>)}
     </div>
   );
 }
