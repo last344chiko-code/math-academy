@@ -579,16 +579,18 @@ th{background:#f8fafc;font-weight:700;color:#475569}.name{text-align:left;font-w
   );
 }
 
-/* ── 상세 미리보기 모달 ── */
+/* ── 상세 미리보기 모달 (메모 포함 여부 선택 + PDF) ── */
 function DetailPreview({targets,dates,selYM,onClose}){
   const [y,m]=selYM.split("-");
+  const [inclMemo,setInclMemo]=useState(true);
   const weekDayNames=["일","월","화","수","목","금","토"];
+
   function doPrint(){
     const html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>상세 레포트</title>
 <style>@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}body{font-family:'Noto Sans KR',sans-serif;padding:15px;background:#fff;font-size:10px;color:#1e293b}
 h2{font-size:13px;margin-bottom:2px}p{font-size:9px;color:#94a3b8;margin-bottom:10px}
-.student{margin-bottom:14px;break-inside:avoid}
+.student{margin-bottom:16px;break-inside:avoid}
 .s-header{display:flex;justify-content:space-between;align-items:center;padding:5px 8px;background:#f8fafc;border-radius:6px;margin-bottom:6px;border-left:3px solid #3b82f6}
 .s-name{font-weight:700;font-size:11px}.s-info{font-size:9px;color:#94a3b8}
 .tags{display:flex;gap:4px;flex-wrap:wrap}
@@ -601,15 +603,22 @@ h2{font-size:13px;margin-bottom:2px}p{font-size:9px;color:#94a3b8;margin-bottom:
 .dn{font-size:7px;color:#94a3b8;text-align:right}
 .att{width:14px;height:14px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:6px;color:#fff;font-weight:700}
 .hw{width:14px;height:14px;border-radius:2px;display:inline-flex;align-items:center;justify-content:center;font-size:7px;color:#fff;font-weight:700}
+.memo-dot{width:5px;height:5px;border-radius:50%;background:#f59e0b;display:inline-block}
 .indicators{display:flex;gap:2px;flex-wrap:wrap;margin-top:1px}
+.memo-list{margin-top:8px;border-top:1px dashed #e2e8f0;padding-top:6px}
+.memo-list-title{font-size:9px;font-weight:700;color:#475569;margin-bottom:4px}
+.memo-item{display:flex;gap:6px;margin-bottom:3px;font-size:9px;line-height:1.4}
+.memo-date{color:#94a3b8;white-space:nowrap;min-width:40px}
+.memo-text{color:#1e293b}
 @media print{body{padding:8px}.student{page-break-inside:avoid}}</style></head><body>
-<h2>봄 학원 출결·숙제 상세 — ${y}년 ${m}월</h2>
+<h2>봄 학원 출결·숙제 상세 — ${y}년 ${m}월${inclMemo?" (메모 포함)":""}</h2>
 <p>출력일: ${new Date().toLocaleDateString("ko-KR")}</p>
 ${targets.map(s=>{
   const recs=dates.map(d=>({date:d,...(s.records?.[d]||{})}));
   const present=recs.filter(r=>r.att==="present").length;
   const absent=recs.filter(r=>r.att==="absent").length;
   const makeup=recs.filter(r=>r.att==="makeup").length;
+  const memos=recs.filter(r=>r.memo);
   const firstDay=new Date(y,m-1,1).getDay();
   const emptyCells=Array(firstDay).fill(null);
   return `<div class="student">
@@ -622,31 +631,52 @@ ${recs.map(({date,att,hw,memo})=>{
   const dn=parseInt(date.slice(8));
   const attColor=att?ATT_COLOR[att]:"";
   const attLabel=att==="present"?"출":att==="absent"?"결":att==="makeup"?"보":"";
-  return `<div class="day"><div class="dn">${dn}</div><div class="indicators">${att?`<span class="att" style="background:${attColor}">${attLabel}</span>`:""}</div><div class="indicators">${hw?`<span class="hw" style="background:${HW_COLOR[hw]}">${hw.toUpperCase()}</span>`:""}</div></div>`;
+  return `<div class="day"><div class="dn">${dn}</div><div class="indicators">${att?`<span class="att" style="background:${attColor}">${attLabel}</span>`:""}</div><div class="indicators">${hw?`<span class="hw" style="background:${HW_COLOR[hw]}">${hw.toUpperCase()}</span>`:""}</div>${inclMemo&&memo?`<div class="indicators"><span class="memo-dot"></span></div>`:""}
+</div>`;
 }).join("")}
-</div></div>`;
+</div>
+${inclMemo&&memos.length>0?`<div class="memo-list"><div class="memo-list-title">📝 메모</div>${memos.map(({date,memo})=>`<div class="memo-item"><span class="memo-date">${date.slice(5)}</span><span class="memo-text">${memo}</span></div>`).join("")}</div>`:""}
+</div>`;
 }).join("")}</body></html>`;
     printHtml(html);
   }
+
   return(
     <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,.6)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:"1rem",backdropFilter:"blur(3px)"}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
       <div style={{background:C.card,borderRadius:"16px",padding:"1.5rem",width:"100%",maxWidth:"860px",maxHeight:"90vh",overflowY:"auto",border:`1px solid ${C.border}`,boxShadow:"0 20px 60px rgba(0,0,0,.2)"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1.25rem"}}>
+        {/* 헤더 */}
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1rem"}}>
           <div>
             <h3 style={{margin:0,fontFamily:C.font,fontSize:"1rem",color:C.text}}>📋 상세 미리보기</h3>
-            <div style={{fontSize:"0.75rem",color:C.muted,fontFamily:C.font,marginTop:"2px"}}>{y}년 {m}월 달력 형태 · {targets.length}명</div>
+            <div style={{fontSize:"0.75rem",color:C.muted,fontFamily:C.font,marginTop:"2px"}}>{y}년 {m}월 · {targets.length}명</div>
           </div>
-          <div style={{display:"flex",gap:"8px"}}>
-            <Btn sm onClick={doPrint}>🖨️ 인쇄/PDF</Btn>
-            <button onClick={onClose} style={{background:C.card2,border:`1px solid ${C.border}`,borderRadius:"8px",color:C.muted,cursor:"pointer",width:"32px",height:"32px",fontSize:"1.1rem"}}>×</button>
+          <button onClick={onClose} style={{background:C.card2,border:`1px solid ${C.border}`,borderRadius:"8px",color:C.muted,cursor:"pointer",width:"32px",height:"32px",fontSize:"1.1rem"}}>×</button>
+        </div>
+
+        {/* 옵션 + 인쇄 버튼 */}
+        <div style={{background:C.card2,borderRadius:"10px",padding:"0.85rem 1rem",marginBottom:"1.25rem",border:`1px solid ${C.border}`,display:"flex",alignItems:"center",flexWrap:"wrap",gap:"12px"}}>
+          <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
+            <span style={{fontSize:"0.82rem",color:C.text2,fontFamily:C.font,fontWeight:600}}>PDF 옵션</span>
+          </div>
+          {/* 메모 포함 토글 */}
+          <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
+            <button onClick={()=>setInclMemo(p=>!p)} style={{width:"42px",height:"24px",borderRadius:"12px",border:"none",cursor:"pointer",background:inclMemo?"#3b82f6":"#cbd5e1",position:"relative",transition:"background .2s",flexShrink:0}}>
+              <div style={{width:"18px",height:"18px",borderRadius:"50%",background:"#fff",position:"absolute",top:"3px",left:inclMemo?"21px":"3px",transition:"left .2s",boxShadow:"0 1px 3px rgba(0,0,0,.2)"}}/>
+            </button>
+            <span style={{fontSize:"0.82rem",color:inclMemo?C.text:C.muted,fontFamily:C.font,fontWeight:600}}>📝 메모 포함</span>
+          </div>
+          <div style={{marginLeft:"auto"}}>
+            <Btn sm onClick={doPrint}>🖨️ PDF 인쇄/저장</Btn>
           </div>
         </div>
+
         {/* 학생별 달력 */}
         {targets.map(s=>{
           const recs=dates.map(d=>({date:d,...(s.records?.[d]||{})}));
           const present=recs.filter(r=>r.att==="present").length;
           const absent=recs.filter(r=>r.att==="absent").length;
           const makeup=recs.filter(r=>r.att==="makeup").length;
+          const memos=recs.filter(r=>r.memo);
           const firstDay=new Date(parseInt(y),parseInt(m)-1,1).getDay();
           return(
             <div key={s.id} style={{marginBottom:"1.25rem",background:C.card2,borderRadius:"12px",border:`1px solid ${C.border}`,overflow:"hidden"}}>
@@ -664,6 +694,7 @@ ${recs.map(({date,att,hw,memo})=>{
                   <Tag c="#ef4444">결석 {absent}</Tag>
                   <Tag c="#8b5cf6">보강 {makeup}</Tag>
                   {HW_OPTS.map(h=>{const cnt=recs.filter(r=>r.hw===h).length;return cnt>0?<Tag key={h} c={HW_COLOR[h]}>{h.toUpperCase()} {cnt}</Tag>:null;})}
+                  {memos.length>0&&<Tag c="#f59e0b">메모 {memos.length}</Tag>}
                 </div>
               </div>
               {/* 달력 */}
@@ -677,15 +708,16 @@ ${recs.map(({date,att,hw,memo})=>{
                     const dn=parseInt(date.slice(8));
                     const dow=new Date(parseInt(y),parseInt(m)-1,dn).getDay();
                     return(
-                      <div key={date} style={{border:`1.5px solid ${att?ATT_COLOR[att]:C.border}`,borderRadius:"6px",padding:"3px 4px",minHeight:"42px",background:att?ATT_COLOR[att]+"08":"#fff",display:"flex",flexDirection:"column",gap:"2px"}}>
+                      <div key={date} style={{border:`1.5px solid ${att?ATT_COLOR[att]:C.border}`,borderRadius:"6px",padding:"3px 4px",minHeight:"44px",background:att?ATT_COLOR[att]+"08":"#fff",display:"flex",flexDirection:"column",gap:"2px"}}>
                         <div style={{fontSize:"0.6rem",color:dow===0?"#ef4444":dow===6?"#3b82f6":C.muted,fontWeight:600,fontFamily:C.font,textAlign:"right"}}>{dn}</div>
                         {att&&<div style={{width:"18px",height:"18px",borderRadius:"50%",background:ATT_COLOR[att],display:"flex",alignItems:"center",justifyContent:"center",fontSize:"0.56rem",color:"#fff",fontWeight:700,margin:"0 auto"}}>{att==="present"?"출":att==="absent"?"결":"보"}</div>}
                         {hw&&<div style={{width:"18px",height:"18px",borderRadius:"3px",background:HW_COLOR[hw],display:"flex",alignItems:"center",justifyContent:"center",fontSize:"0.62rem",color:"#fff",fontWeight:700,margin:"0 auto"}}>{hw.toUpperCase()}</div>}
-                        {memo&&!hw&&<div style={{width:"6px",height:"6px",borderRadius:"50%",background:"#f59e0b",margin:"0 auto"}}/>}
+                        {memo&&<div style={{width:"6px",height:"6px",borderRadius:"50%",background:"#f59e0b",margin:"0 auto"}} title={memo}/>}
                       </div>
                     );
                   })}
                 </div>
+
                 {/* 범례 */}
                 <div style={{display:"flex",gap:"8px",flexWrap:"wrap",marginTop:"8px",paddingTop:"8px",borderTop:`1px dashed ${C.border}`}}>
                   {[["출","출석","#10b981"],["결","결석","#ef4444"],["보","보강","#8b5cf6"]].map(([l,n,c])=>(
@@ -700,7 +732,28 @@ ${recs.map(({date,att,hw,memo})=>{
                       <span style={{fontSize:"0.65rem",color:C.muted,fontFamily:C.font}}>{HW_DESC[h].split("—")[1]?.trim()}</span>
                     </div>
                   ))}
+                  <div style={{display:"flex",alignItems:"center",gap:"4px"}}>
+                    <div style={{width:"8px",height:"8px",borderRadius:"50%",background:"#f59e0b"}}/>
+                    <span style={{fontSize:"0.65rem",color:C.muted,fontFamily:C.font}}>메모</span>
+                  </div>
                 </div>
+
+                {/* 메모 리스트 (화면 항상 표시) */}
+                {memos.length>0&&(
+                  <div style={{marginTop:"10px",paddingTop:"10px",borderTop:`1px solid ${C.border}`}}>
+                    <div style={{fontSize:"0.76rem",fontWeight:700,color:C.text2,fontFamily:C.font,marginBottom:"6px"}}>📝 메모</div>
+                    {memos.map(({date,memo,att,hw})=>(
+                      <div key={date} style={{display:"flex",gap:"10px",marginBottom:"5px",alignItems:"flex-start",background:"#fff",borderRadius:"7px",padding:"6px 10px",border:`1px solid ${C.border}`}}>
+                        <div style={{display:"flex",gap:"4px",alignItems:"center",flexShrink:0}}>
+                          <span style={{fontSize:"0.72rem",fontWeight:700,color:C.accent,fontFamily:C.font,minWidth:"32px"}}>{date.slice(5)}</span>
+                          {att&&<div style={{width:"16px",height:"16px",borderRadius:"50%",background:ATT_COLOR[att],display:"flex",alignItems:"center",justifyContent:"center",fontSize:"0.52rem",color:"#fff",fontWeight:700}}>{att==="present"?"출":att==="absent"?"결":"보"}</div>}
+                          {hw&&<div style={{width:"16px",height:"16px",borderRadius:"3px",background:HW_COLOR[hw],display:"flex",alignItems:"center",justifyContent:"center",fontSize:"0.55rem",color:"#fff",fontWeight:700}}>{hw.toUpperCase()}</div>}
+                        </div>
+                        <span style={{fontSize:"0.78rem",color:C.text,fontFamily:C.font,lineHeight:1.5,flex:1}}>{memo}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           );
